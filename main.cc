@@ -4,8 +4,8 @@
 #include "client_lib.h"
 
 int main(int /* argc */, char** /* argv[] */) {
-	MumbleClientLib *mcl = MumbleClientLib::instance();
+	MumbleClientLib* mcl = MumbleClientLib::instance();
 
-	MumbleClient *mc = mcl->NewClient();
+	MumbleClient* mc = mcl->NewClient();
 	mc->Connect();
 }

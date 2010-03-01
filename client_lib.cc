@@ -8,7 +8,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 // static
-MumbleClientLib *MumbleClientLib::instance_ = NULL;
+MumbleClientLib* MumbleClientLib::instance_ = NULL;
 
 // static
 char* MumbleClientLib::Pk11GetPassword(PK11SlotInfo* /* slot */, PRBool /* retry */, void* /* arg */) {
@@ -45,7 +45,7 @@ MumbleClientLib::~MumbleClientLib() {
 ///////////////////////////////////////////////////////////////////////////////
 // MumbleClientLib, public:
 
-MumbleClientLib *MumbleClientLib::instance() {
+MumbleClientLib* MumbleClientLib::instance() {
 	if (instance_ == NULL) {
 		instance_ = new MumbleClientLib();
 		return instance_;
@@ -54,6 +54,6 @@ MumbleClientLib *MumbleClientLib::instance() {
 	return instance_;
 }
 
-MumbleClient *MumbleClientLib::NewClient() {
+MumbleClient* MumbleClientLib::NewClient() {
 	return new MumbleClient();
 }

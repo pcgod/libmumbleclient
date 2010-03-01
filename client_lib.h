@@ -10,7 +10,7 @@ class MumbleClient;
 class MumbleClientLib {
   public:
 	static MumbleClientLib* instance();
-	MumbleClient *NewClient();
+	MumbleClient* NewClient();
 
   private:
 	MumbleClientLib();
