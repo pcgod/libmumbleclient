@@ -78,8 +78,8 @@ void MumbleClient::ParseMessage(const MessageHeader& msg_header, void* buffer) {
 	}
 }
 
-void MumbleClient::ProcessTCPSendQueue() {
-	while (send_queue_.size() > 0) {
+bool MumbleClient::ProcessTCPSendQueue() {
+	while (!send_queue_.empty()) {
 		Message msg = send_queue_.front();
 
 		PRIOVec iv[2];
@@ -91,11 +91,13 @@ void MumbleClient::ProcessTCPSendQueue() {
 		int32 ret = PR_Writev(tcp_socket_, reinterpret_cast<PRIOVec *>(&iv), 2, PR_INTERVAL_NO_TIMEOUT);
 		if (ret == -1) {
 			std::cerr << "DEQUEUE: Write would block..." << std::endl;
-			break;
+			return true;
 		}
-		std::cout << "<< DEQUEUE: Type: " << ntohs(msg.header_.type) << " Size: " << htonl(msg.header_.length) << " sizeof: " << sizeof(msg.header_) << " Length: 6+" << msg.msg_.size() << std::endl;
+		std::cout << "<< DEQUEUE: Type: " << ntohs(msg.header_.type) << " Length: 6+" << msg.msg_.size() << std::endl;
 		send_queue_.pop_front();
 	}
+
+	return false;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -167,7 +169,7 @@ void MumbleClient::Connect() {
 	PRIntervalTime ping_timer = PR_IntervalNow();
 
 	while (PR_TRUE) {
-		int32 ret = PR_Poll(pds, 2, PR_SecondsToInterval(5));
+		int32 ret = PR_Poll(pds, 2, PR_SecondsToInterval(1));
 		if (ret == -1) {
 			std::cerr << "PR_Poll failed" << std::endl;
 			exit(1);
@@ -185,6 +187,15 @@ void MumbleClient::Connect() {
 		}
 
 		for (int i = 0; i < 2; ++i) {
+			// Check if we want to write data
+			if (pds[i].fd == tcp_socket_) {
+				if (!send_queue_.empty()) {
+					pds[i].in_flags = pds[i].in_flags | PR_POLL_WRITE;
+				} else {
+					pds[i].in_flags = pds[i].in_flags ^ PR_POLL_WRITE;
+				}
+			}
+
 			// TCP socket handling - write
 			if (pds[i].fd == tcp_socket_ && pds[i].out_flags & PR_POLL_WRITE) {
 				if (state_ >= kStateHandshakeCompleted)
@@ -253,8 +264,7 @@ void MumbleClient::sendMessage(PbMessageType::MessageType type, const ::google::
 	msg_header.type = PR_htons(static_cast<int16>(type));
 	msg_header.length = PR_htonl(length);
 
-	std::string pb_message;
-	msg.SerializeToString(&pb_message);
+	std::string pb_message = msg.SerializeAsString();
 
 	Message message(msg_header, pb_message);
 	send_queue_.push_back(message);

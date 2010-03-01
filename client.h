@@ -46,7 +46,7 @@ class MumbleClient {
 	MumbleClient();
 
 	void ParseMessage(const mumble_message::MessageHeader& msg_header, void* buffer);
-	void ProcessTCPSendQueue();
+	bool ProcessTCPSendQueue();
 	static void SSLHandshakeCallback(PRFileDesc*, void*);
 	static SECStatus SSLBadCertificateCallback(void*, PRFileDesc*);
 
