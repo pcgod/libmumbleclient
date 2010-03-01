@@ -1,5 +1,5 @@
-#ifndef SETTINGS_H
-#define SETTINGS_H
+#ifndef SETTINGS_H_
+#define SETTINGS_H_
 
 class Settings {
   public:
@@ -12,8 +12,8 @@ class Settings {
 		return "0xy.de";
 	}
 
-	static int32 getPort() {
-		return 64379;
+	static uint16 getPort() {
+		return 64739;
 	}
 
 	static std::string getUserName() {
@@ -30,4 +30,4 @@ class Settings {
 	void operator=(const Settings&);
 };
 
-#endif
+#endif  // SETTINGS_H_
