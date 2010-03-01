@@ -1,0 +1,8 @@
+*.db
+*.pb.*
+*.cmake
+Makefile
+main
+pkcs11.txt
+CMakeCache.txt
+CMakeFiles/*
