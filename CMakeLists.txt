@@ -7,10 +7,10 @@ SET(CMAKE_BUILD_TYPE Debug)
 SET(CMAKE_C_FLAGS_DEBUG "-g -Wall -Wextra -pedantic -Wfatal-errors -Wshadow")
 SET(CMAKE_CXX_FLAGS_DEBUG "-g -Wall -Wextra -Wfatal-errors -Wshadow -Woverloaded-virtual -Wold-style-cast")
 
-include_directories(/usr/include/nss /usr/include/nspr ${CMAKE_CURRENT_BINARY_DIR})
+include_directories(/usr/include/boost ${CMAKE_CURRENT_BINARY_DIR})
 
 add_executable (main main.cc client.cc client_lib.cc ${CMAKE_CURRENT_BINARY_DIR}/Mumble.pb.cc)
-target_link_libraries (main nss3 ssl3 protobuf)
+target_link_libraries (main boost_system pthread ssl crypto protobuf)
 
 add_custom_command (
 	OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/Mumble.pb.h ${CMAKE_CURRENT_BINARY_DIR}/Mumble.pb.cc

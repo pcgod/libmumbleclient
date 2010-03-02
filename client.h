@@ -1,22 +1,29 @@
 #ifndef CLIENT_H_
 #define CLIENT_H_
 
-#include "nss.h"
-#include "pk11pub.h"
-#include "ssl.h"
+#include "stdint.h"
 
+#include <boost/array.hpp>
+#include <boost/asio.hpp>
+#include <boost/asio/ssl.hpp>
 #include <deque>
 
 #include "messages.h"
 #include "Mumble.pb.h"
+
+using boost::asio::ip::tcp;
+using boost::asio::ip::udp;
+using boost::asio::ssl::stream;
+
+#define SSL 1
 
 namespace mumble_message {
 
 #pragma pack(push)
 #pragma pack(1)
 struct MessageHeader {
-	int16 type;
-	int32 length;
+	int16_t type;
+	int32_t length;
 } /*__attribute__((packed))*/;
 #pragma pack(pop)
 
@@ -38,6 +45,7 @@ class MumbleClient {
 	};
 
   public:
+	~MumbleClient();
 	void Connect();
 	void sendMessage(PbMessageType::MessageType type, const ::google::protobuf::Message& msg, bool print);
 
@@ -45,15 +53,21 @@ class MumbleClient {
 	friend class MumbleClientLib;
 	MumbleClient();
 
+	void DoPing(const boost::system::error_code& error);
 	void ParseMessage(const mumble_message::MessageHeader& msg_header, void* buffer);
-	bool ProcessTCPSendQueue();
-	static void SSLHandshakeCallback(PRFileDesc*, void*);
-	static SECStatus SSLBadCertificateCallback(void*, PRFileDesc*);
+	void ProcessTCPSendQueue(const boost::system::error_code& error, const size_t bytes_transferred);
+	void ReadWriteHandler(const boost::system::error_code& error);
 
+	boost::asio::io_service io_service_;
 	std::deque<mumble_message::Message> send_queue_;
 	State state_;
-	PRFileDesc* tcp_socket_;
-	PRFileDesc* udp_socket_;
+#if SSL
+	stream<tcp::socket>* tcp_socket_;
+#else
+	tcp::socket* tcp_socket_;
+#endif
+	udp::socket* udp_socket_;
+	boost::asio::deadline_timer* ping_timer_;
 
 	MumbleClient(const MumbleClient&);
 	void operator=(const MumbleClient&);

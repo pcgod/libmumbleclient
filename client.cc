@@ -1,8 +1,7 @@
 #include "client.h"
 
-#include "prmem.h"
-#include "prnetdb.h"
-
+#include <boost/array.hpp>
+#include <boost/asio.hpp>
 #include <deque>
 #include <iostream>
 #include <typeinfo>
@@ -18,7 +17,7 @@ using mumble_message::Message;
 
 namespace {
 
-template <class T> T ConstructProtobufObject(void* buffer, int32 length, bool print) {
+template <class T> T ConstructProtobufObject(void* buffer, int32_t length, bool print) {
 	T pb;
 	pb.ParseFromArray(buffer, length);
 	if (print) {
@@ -34,20 +33,25 @@ template <class T> T ConstructProtobufObject(void* buffer, int32 length, bool pr
 ///////////////////////////////////////////////////////////////////////////////
 // MumbleClient, private:
 
-MumbleClient::MumbleClient() : state_(kStateNew) {
+MumbleClient::MumbleClient() : state_(kStateNew), ping_timer_(NULL) {
 }
 
-// static
-void MumbleClient::SSLHandshakeCallback(PRFileDesc* /* fd */, void* client_data) {
-	MumbleClient* mc = static_cast<MumbleClient *>(client_data);
-	std::cout << "Handshake completed" << std::endl;
-	mc->state_ = kStateHandshakeCompleted;
-}
+void MumbleClient::DoPing(const boost::system::error_code& error) {
+	if (error) {
+		std::cerr << "ping error: " << error.message() << std::endl;
+		return;
+	}
 
-// static
-SECStatus MumbleClient::SSLBadCertificateCallback(void* /* arg */, PRFileDesc* /* fd */) {
-	std::cout << "Cert check failed" << std::endl;
-	return SECSuccess;
+	MumbleProto::Ping p;
+	p.set_timestamp(std::time(NULL));
+	sendMessage(PbMessageType::Ping, p, true);
+
+	// Requeue ping
+	if (!ping_timer_)
+		ping_timer_ = new boost::asio::deadline_timer(io_service_);
+
+	ping_timer_->expires_from_now(boost::posix_time::seconds(5));
+	ping_timer_->async_wait(boost::bind(&MumbleClient::DoPing, this, boost::asio::placeholders::error));
 }
 
 void MumbleClient::ParseMessage(const MessageHeader& msg_header, void* buffer) {
@@ -71,6 +75,8 @@ void MumbleClient::ParseMessage(const MessageHeader& msg_header, void* buffer) {
 	case PbMessageType::ServerSync: {
 		MumbleProto::ServerSync ss = ConstructProtobufObject<MumbleProto::ServerSync>(buffer, msg_header.length, true);
 		state_ = kStateAuthenticated;
+		// Enqueue ping
+		DoPing(boost::system::error_code());
 		break;
 	}
 	default:
@@ -78,72 +84,87 @@ void MumbleClient::ParseMessage(const MessageHeader& msg_header, void* buffer) {
 	}
 }
 
-bool MumbleClient::ProcessTCPSendQueue() {
-	while (!send_queue_.empty()) {
-		Message msg = send_queue_.front();
-
-		PRIOVec iv[2];
-		iv[0].iov_base = reinterpret_cast<char *>(&msg.header_);
-		iv[0].iov_len = sizeof(msg.header_);
-		iv[1].iov_base = const_cast<char *>(msg.msg_.data());
-		iv[1].iov_len = msg.msg_.size();
-
-		int32 ret = PR_Writev(tcp_socket_, reinterpret_cast<PRIOVec *>(&iv), 2, PR_INTERVAL_NO_TIMEOUT);
-		if (ret == -1) {
-			std::cerr << "DEQUEUE: Write would block..." << std::endl;
-			return true;
-		}
-		std::cout << "<< DEQUEUE: Type: " << ntohs(msg.header_.type) << " Length: 6+" << msg.msg_.size() << std::endl;
+void MumbleClient::ProcessTCPSendQueue(const boost::system::error_code& error, const size_t /*bytes_transferred*/) {
+	if (!error) {
 		send_queue_.pop_front();
-	}
 
-	return false;
+		if (send_queue_.empty())
+			return;
+
+		Message& msg = send_queue_.front();
+
+		std::vector<boost::asio::const_buffer> bufs;
+		bufs.push_back(boost::asio::buffer(reinterpret_cast<char *>(&msg.header_), sizeof(msg.header_)));
+		bufs.push_back(boost::asio::buffer(msg.msg_, msg.msg_.size()));
+
+		async_write(*tcp_socket_, bufs, boost::bind(&MumbleClient::ProcessTCPSendQueue, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
+		std::cout << "<< ASYNC Type: " << ntohs(msg.header_.type) << " Length: 6+" << msg.msg_.size() << std::endl;
+	} else {
+		std::cerr << "Write error: " << error.message() << std::endl;
+	}
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 // MumbleClient, public:
 
+MumbleClient::~MumbleClient() {
+	delete ping_timer_;
+}
+
 void MumbleClient::Connect() {
 	// Resolve hostname
 	std::cerr << "Resolving host " << Settings::getHost() << std::endl;
 
-	char buf[PR_NETDB_BUF_SIZE];
-	PRHostEnt host_entry;
-	if (PR_GetHostByName(Settings::getHost().c_str(), buf, sizeof(buf), &host_entry) == PR_FAILURE) {
-		std::cout << "unknown host name: " << Settings::getHost() << std::endl;
+	tcp::resolver resolver(io_service_);
+	tcp::resolver::query query(Settings::getHost(), Settings::getPort());
+	tcp::resolver::iterator endpoint_iterator = resolver.resolve(query);
+	tcp::resolver::iterator end;
+
+	// Try to connect
+#if SSL
+	boost::asio::ssl::context ctx(io_service_, boost::asio::ssl::context::tlsv1);
+	tcp_socket_ = new boost::asio::ssl::stream<tcp::socket>(io_service_, ctx);
+#else
+	tcp_socket_ = new tcp::socket(io_service_);
+#endif
+	boost::system::error_code error = boost::asio::error::host_not_found;
+	while (error && endpoint_iterator != end) {
+		std::cerr << "Connecting to " << (*endpoint_iterator).endpoint().address() << " ..." << std::endl;
+#if SSL
+		tcp_socket_->lowest_layer().close();
+		tcp_socket_->lowest_layer().connect(*endpoint_iterator++, error);
+#else
+		tcp_socket_->close();
+		tcp_socket_->connect(*endpoint_iterator++, error);
+#endif
+	}
+	if (error) {
+		std::cerr << "connection error: " << error.message() << std::endl;
 		exit(1);
 	}
 
-	PRNetAddr addr;
-	/*PRIntn er =*/ PR_EnumerateHostEnt(0, &host_entry, Settings::getPort(), &addr);
+#if SSL
+	udp::endpoint udp_endpoint((*endpoint_iterator).endpoint().address(), (*endpoint_iterator).endpoint().port());
+	udp_socket_ = new udp::socket(io_service_);
+	udp_socket_->connect(udp_endpoint, error);
 
-	udp_socket_ = PR_NewUDPSocket();
-	tcp_socket_ = PR_NewTCPSocket();
-
-	// Connect
-	std::cerr << "Connecting..." << std::endl;
-	if (PR_Connect(tcp_socket_, &addr, PR_SecondsToInterval(30)) != PR_SUCCESS) {
-		std::cerr << "Connection failed " << PR_GetError() << std::endl;
+	// Do SSL handshake
+	tcp_socket_->handshake(boost::asio::ssl::stream_base::client, error);
+	if (error) {
+		std::cerr << "handshake error: " << error.message() << std::endl;
 		exit(1);
 	}
-	PR_Connect(udp_socket_, &addr, PR_INTERVAL_NO_TIMEOUT);
+#endif
 
-	// Set SSL options
-	SSL_OptionSetDefault(SSL_ENABLE_SSL3, PR_FALSE);
-	SSL_OptionSetDefault(SSL_ENABLE_SSL2, PR_FALSE);
-	SSL_OptionSetDefault(SSL_V2_COMPATIBLE_HELLO, PR_FALSE);
-	SSL_OptionSetDefault(SSL_ENABLE_TLS, PR_TRUE);
+	std::cout << "Handshake completed" << std::endl;
+	state_ = kStateHandshakeCompleted;
 
-	tcp_socket_ = SSL_ImportFD(NULL, tcp_socket_);
-	SSL_HandshakeCallback(tcp_socket_, SSLHandshakeCallback, this);
-	SSL_BadCertHook(tcp_socket_, SSLBadCertificateCallback, NULL);
-	SSL_SetURL(tcp_socket_, Settings::getHost().c_str());
-	PRSocketOptionData po = { PR_SockOpt_Nonblocking, {PR_TRUE} };
-	PR_SetSocketOption(tcp_socket_, &po);
-
-	// Force SSL handshake
-	SSL_ResetHandshake(tcp_socket_, PR_FALSE);
-	SSL_ForceHandshake(tcp_socket_);
+	boost::asio::socket_base::non_blocking_io nbio_command(true);
+#if SSL
+	tcp_socket_->lowest_layer().io_control(nbio_command);
+#else
+	tcp_socket_->io_control(nbio_command);
+#endif
 
 	// Send initial messages
 	MumbleProto::Version v;
@@ -158,114 +179,65 @@ void MumbleClient::Connect() {
 	a.add_celt_versions(0x8000000b);
 	sendMessage(PbMessageType::Authenticate, a, true);
 
-	// Net event loop
-	PRPollDesc pds[2];
-	pds[0].fd = tcp_socket_;
-	pds[0].in_flags = PR_POLL_READ | PR_POLL_WRITE;
-	pds[1].fd = udp_socket_;
-	pds[1].in_flags = PR_POLL_READ; // | PR_POLL_WRITE;
-
-	PRIntervalTime ping_interval = PR_SecondsToInterval(5);
-	PRIntervalTime ping_timer = PR_IntervalNow();
-
-	while (PR_TRUE) {
-		int32 ret = PR_Poll(pds, 2, PR_SecondsToInterval(1));
-		if (ret == -1) {
-			std::cerr << "PR_Poll failed" << std::endl;
-			exit(1);
-		}
-
-		// Ping handling
-		if (state_ >= kStateAuthenticated && static_cast<PRIntervalTime>(PR_IntervalNow() - ping_timer) > ping_interval) {
-			ping_timer = PR_IntervalNow();
-			MumbleProto::Ping p;
-			p.set_timestamp(PR_Now());
-			sendMessage(PbMessageType::Ping, p, false);
-
-			if (ret == 0)
-				continue;
-		}
-
-		for (int i = 0; i < 2; ++i) {
-			// Check if we want to write data
-			if (pds[i].fd == tcp_socket_) {
-				if (!send_queue_.empty()) {
-					pds[i].in_flags = pds[i].in_flags | PR_POLL_WRITE;
-				} else {
-					pds[i].in_flags = pds[i].in_flags ^ PR_POLL_WRITE;
-				}
-			}
-
-			// TCP socket handling - write
-			if (pds[i].fd == tcp_socket_ && pds[i].out_flags & PR_POLL_WRITE) {
-				if (state_ >= kStateHandshakeCompleted)
-					ProcessTCPSendQueue();
-			}
-			// TCP socket handling - read
-			if (pds[i].fd == tcp_socket_ &&pds[i].out_flags & PR_POLL_READ) {
-				while (PR_TRUE) {
-					// Receive message header
-					MessageHeader msg_header;
-					ret = PR_Recv(pds[i].fd, &msg_header, sizeof(msg_header), 0, PR_INTERVAL_NO_TIMEOUT);
-					if (ret == -1) {
-						if (PR_GetError() == PR_WOULD_BLOCK_ERROR)
-							break;
-						std::cerr << "PR_Recv failed" << std::endl;
-						exit(1);
-					}
-
-					msg_header.type = PR_ntohs(msg_header.type);
-					msg_header.length = PR_ntohl(msg_header.length);
-
-					if (msg_header.length >= 0x7FFFF)
-						exit(1);
-
-					// Receive message body
-					char* buffer = static_cast<char *>(PR_Malloc(msg_header.length));
-					ret = PR_Recv(pds[i].fd, buffer, msg_header.length, 0, PR_INTERVAL_NO_TIMEOUT);
-
-					ParseMessage(msg_header, buffer);
-					PR_Free(buffer);
-				}
-			} else if (pds[i].out_flags & PR_POLL_ERR) {
-				std::cout << "PR_Poll: fd error" << std::endl;
-				exit(1);
-			} else if (pds[i].out_flags & PR_POLL_NVAL) {
-				std::cout << "PR_Poll: fd invalid" << std::endl;
-				exit(1);
-			}
-
-			// UDP socket handling - write
-			if(pds[i].fd == udp_socket_ && pds[i].out_flags & PR_POLL_WRITE) {
-				// NOT IMPLEMENTED
-			}
-			// UDP socket handling - read
-			if (pds[i].fd == udp_socket_ &&pds[i].out_flags & PR_POLL_READ) {
-				// NOT IMPLEMENTED
-			} else if (pds[i].out_flags & PR_POLL_ERR) {
-				std::cout << "PR_Poll: fd error" << std::endl;
-				exit(1);
-			} else if (pds[i].out_flags & PR_POLL_NVAL) {
-				std::cout << "PR_Poll: fd invalid" << std::endl;
-				exit(1);
-			}
-		}
-	}
+	tcp_socket_->async_read_some(boost::asio::null_buffers(), boost::bind(&MumbleClient::ReadWriteHandler, this, boost::asio::placeholders::error));
+	io_service_.run();
 }
 
-void MumbleClient::sendMessage(PbMessageType::MessageType type, const ::google::protobuf::Message& msg, bool print) {
-	if (print) {
-		std::cout << "<< ENQUEUE: " << type << std::endl;
-		msg.PrintDebugString();
+void MumbleClient::ReadWriteHandler(const boost::system::error_code& error) {
+	if (error) {
+		std::cerr << "read error: " << error.message() << std::endl;
+		return;
 	}
 
-	int32 length = msg.ByteSize();
-	MessageHeader msg_header;
-	msg_header.type = PR_htons(static_cast<int16>(type));
-	msg_header.length = PR_htonl(length);
+	// TCP socket handling - read
+	while (true) {
+		// Receive message header
+		MessageHeader msg_header;
+		read(*tcp_socket_, boost::asio::buffer(reinterpret_cast<char *>(&msg_header), 6));
 
-	std::string pb_message = msg.SerializeAsString();
+		msg_header.type = ntohs(msg_header.type);
+		msg_header.length = ntohl(msg_header.length);
+
+		if (msg_header.length >= 0x7FFFF)
+			exit(1);
+
+		// Receive message body
+		char* buffer = static_cast<char *>(malloc(msg_header.length));
+		read(*tcp_socket_, boost::asio::buffer(buffer, msg_header.length));
+
+		ParseMessage(msg_header, buffer);
+		free(buffer);
+		break;
+	}
+
+	// Requeue read
+	tcp_socket_->async_read_some(boost::asio::null_buffers(), boost::bind(&MumbleClient::ReadWriteHandler, this, boost::asio::placeholders::error));
+}
+
+void MumbleClient::sendMessage(PbMessageType::MessageType type, const ::google::protobuf::Message& new_msg, bool print) {
+	if (print) {
+		std::cout << "<< ENQUEUE: " << type << std::endl;
+		new_msg.PrintDebugString();
+	}
+
+	bool write_in_progress = !send_queue_.empty();
+	int32_t length = new_msg.ByteSize();
+	MessageHeader msg_header;
+	msg_header.type = htons(static_cast<int16_t>(type));
+	msg_header.length = htonl(length);
+
+	std::string pb_message = new_msg.SerializeAsString();
 
 	Message message(msg_header, pb_message);
 	send_queue_.push_back(message);
+
+	if (state_ >= kStateHandshakeCompleted && !write_in_progress) {
+		Message& msg = send_queue_.front();
+
+		std::vector<boost::asio::const_buffer> bufs;
+		bufs.push_back(boost::asio::buffer(reinterpret_cast<char *>(&msg.header_), sizeof(msg.header_)));
+		bufs.push_back(boost::asio::buffer(msg.msg_, msg.msg_.size()));
+		async_write(*tcp_socket_, bufs, boost::bind(&MumbleClient::ProcessTCPSendQueue, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
+		std::cout << "<< ASYNC Type: " << ntohs(msg.header_.type) << " Length: 6+" << msg.msg_.size() << std::endl;
+	}
 }

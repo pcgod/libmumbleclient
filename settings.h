@@ -12,8 +12,8 @@ class Settings {
 		return "0xy.de";
 	}
 
-	static uint16 getPort() {
-		return 64739;
+	static std::string getPort() {
+		return "64739";
 	}
 
 	static std::string getUserName() {
