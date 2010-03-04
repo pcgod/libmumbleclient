@@ -3,6 +3,7 @@
 #include <boost/array.hpp>
 #include <boost/asio.hpp>
 #include <deque>
+#include <fstream>
 #include <iostream>
 #include <typeinfo>
 
@@ -33,7 +34,7 @@ template <class T> T ConstructProtobufObject(void* buffer, int32_t length, bool 
 ///////////////////////////////////////////////////////////////////////////////
 // MumbleClient, private:
 
-MumbleClient::MumbleClient() : state_(kStateNew), ping_timer_(NULL) {
+MumbleClient::MumbleClient(boost::asio::io_service* io_service) : io_service_(io_service), state_(kStateNew), ping_timer_(NULL) {
 }
 
 void MumbleClient::DoPing(const boost::system::error_code& error) {
@@ -44,11 +45,11 @@ void MumbleClient::DoPing(const boost::system::error_code& error) {
 
 	MumbleProto::Ping p;
 	p.set_timestamp(std::time(NULL));
-	sendMessage(PbMessageType::Ping, p, true);
+	sendMessage(PbMessageType::Ping, p, false);
 
 	// Requeue ping
 	if (!ping_timer_)
-		ping_timer_ = new boost::asio::deadline_timer(io_service_);
+		ping_timer_ = new boost::asio::deadline_timer(*io_service_);
 
 	ping_timer_->expires_from_now(boost::posix_time::seconds(5));
 	ping_timer_->async_wait(boost::bind(&MumbleClient::DoPing, this, boost::asio::placeholders::error));
@@ -77,6 +78,13 @@ void MumbleClient::ParseMessage(const MessageHeader& msg_header, void* buffer) {
 		state_ = kStateAuthenticated;
 		// Enqueue ping
 		DoPing(boost::system::error_code());
+		break;
+	}
+	case PbMessageType::UDPTunnel: {
+		std::fstream fs("udptunnel.out", std::fstream::app | std::fstream::out | std::fstream::binary);
+		fs.write(reinterpret_cast<const char *>(&msg_header.length), 4);
+		fs.write(reinterpret_cast<char *>(buffer), msg_header.length);
+		fs.close();
 		break;
 	}
 	default:
@@ -109,23 +117,25 @@ void MumbleClient::ProcessTCPSendQueue(const boost::system::error_code& error, c
 
 MumbleClient::~MumbleClient() {
 	delete ping_timer_;
+	delete tcp_socket_;
+	delete udp_socket_;
 }
 
 void MumbleClient::Connect() {
 	// Resolve hostname
 	std::cerr << "Resolving host " << Settings::getHost() << std::endl;
 
-	tcp::resolver resolver(io_service_);
+	tcp::resolver resolver(*io_service_);
 	tcp::resolver::query query(Settings::getHost(), Settings::getPort());
 	tcp::resolver::iterator endpoint_iterator = resolver.resolve(query);
 	tcp::resolver::iterator end;
 
 	// Try to connect
 #if SSL
-	boost::asio::ssl::context ctx(io_service_, boost::asio::ssl::context::tlsv1);
-	tcp_socket_ = new boost::asio::ssl::stream<tcp::socket>(io_service_, ctx);
+	boost::asio::ssl::context ctx(*io_service_, boost::asio::ssl::context::tlsv1);
+	tcp_socket_ = new boost::asio::ssl::stream<tcp::socket>(*io_service_, ctx);
 #else
-	tcp_socket_ = new tcp::socket(io_service_);
+	tcp_socket_ = new tcp::socket(*io_service_);
 #endif
 	boost::system::error_code error = boost::asio::error::host_not_found;
 	while (error && endpoint_iterator != end) {
@@ -145,7 +155,7 @@ void MumbleClient::Connect() {
 
 #if SSL
 	udp::endpoint udp_endpoint((*endpoint_iterator).endpoint().address(), (*endpoint_iterator).endpoint().port());
-	udp_socket_ = new udp::socket(io_service_);
+	udp_socket_ = new udp::socket(*io_service_);
 	udp_socket_->connect(udp_endpoint, error);
 
 	// Do SSL handshake
@@ -180,7 +190,6 @@ void MumbleClient::Connect() {
 	sendMessage(PbMessageType::Authenticate, a, true);
 
 	tcp_socket_->async_read_some(boost::asio::null_buffers(), boost::bind(&MumbleClient::ReadWriteHandler, this, boost::asio::placeholders::error));
-	io_service_.run();
 }
 
 void MumbleClient::ReadWriteHandler(const boost::system::error_code& error) {

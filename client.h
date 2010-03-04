@@ -3,7 +3,6 @@
 
 #include "stdint.h"
 
-#include <boost/array.hpp>
 #include <boost/asio.hpp>
 #include <boost/asio/ssl.hpp>
 #include <deque>
@@ -51,14 +50,14 @@ class MumbleClient {
 
   private:
 	friend class MumbleClientLib;
-	MumbleClient();
+	MumbleClient(boost::asio::io_service* io_service);
 
 	void DoPing(const boost::system::error_code& error);
 	void ParseMessage(const mumble_message::MessageHeader& msg_header, void* buffer);
 	void ProcessTCPSendQueue(const boost::system::error_code& error, const size_t bytes_transferred);
 	void ReadWriteHandler(const boost::system::error_code& error);
 
-	boost::asio::io_service io_service_;
+	boost::asio::io_service* io_service_;
 	std::deque<mumble_message::Message> send_queue_;
 	State state_;
 #if SSL

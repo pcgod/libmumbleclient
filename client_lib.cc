@@ -32,5 +32,9 @@ MumbleClientLib* MumbleClientLib::instance() {
 }
 
 MumbleClient* MumbleClientLib::NewClient() {
-	return new MumbleClient();
+	return new MumbleClient(&io_service_);
+}
+
+void MumbleClientLib::Run() {
+	io_service_.run();
 }
