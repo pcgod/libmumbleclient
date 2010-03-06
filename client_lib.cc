@@ -5,6 +5,8 @@
 #include "client.h"
 #include "settings.h"
 
+namespace MumbleClient {
+
 ///////////////////////////////////////////////////////////////////////////////
 
 // static
@@ -38,3 +40,5 @@ MumbleClient* MumbleClientLib::NewClient() {
 void MumbleClientLib::Run() {
 	io_service_.run();
 }
+
+}  // end namespace MumbleClient

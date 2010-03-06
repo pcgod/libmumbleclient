@@ -1,6 +1,8 @@
 #ifndef MESSAGES_H_
 #define MESSAGES_H_
 
+namespace MumbleClient {
+
 namespace PbMessageType {
 	enum MessageType {
 		Version,
@@ -30,5 +32,7 @@ namespace PbMessageType {
 		ServerConfig
 	};
 }
+
+}  // end namespace MumbleClient
 
 #endif  // MESSAGES_H_

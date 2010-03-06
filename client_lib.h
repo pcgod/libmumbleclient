@@ -3,6 +3,8 @@
 
 #include <boost/asio.hpp>
 
+namespace MumbleClient {
+
 class MumbleClient;
 
 class MumbleClientLib {
@@ -21,5 +23,7 @@ class MumbleClientLib {
 	MumbleClientLib(const MumbleClientLib&);
 	void operator=(const MumbleClientLib&);
 };
+
+}  // end namespace MumbleClient
 
 #endif  // CLIENT_LIB_H_

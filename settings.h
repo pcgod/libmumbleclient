@@ -1,33 +1,33 @@
 #ifndef SETTINGS_H_
 #define SETTINGS_H_
 
+namespace MumbleClient {
+
 class Settings {
   public:
-
-	static std::string getSSLDbPath() {
-		return "sql:.";
-	}
-
-	static std::string getHost() {
+	std::string getHost() const {
 		return "0xy.de";
 	}
 
-	static std::string getPort() {
+	std::string getPort() const {
 		return "64739";
 	}
 
-	static std::string getUserName() {
+	std::string getUserName() const {
 		return "testBot";
 	}
 
-	static std::string getPassword() {
+	std::string getPassword() const {
 		return "";
 	}
-
+/*
   private:
 	Settings();
 	Settings(const Settings&);
 	void operator=(const Settings&);
+*/
 };
+
+}  // end namespace MumbleClient
 
 #endif  // SETTINGS_H_

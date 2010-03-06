@@ -10,11 +10,15 @@
 #include "messages.h"
 #include "Mumble.pb.h"
 
+namespace MumbleClient {
+
 using boost::asio::ip::tcp;
 using boost::asio::ip::udp;
 using boost::asio::ssl::stream;
 
 #define SSL 1
+
+class Settings;
 
 namespace mumble_message {
 
@@ -36,6 +40,10 @@ struct Message {
 }  // namespace mumble_message
 
 
+typedef boost::function<void (const std::string& text)> TextMessageCallbackType;
+typedef boost::function<void ()> AuthCallbackType;
+typedef boost::function<void (int32_t length, void* buffer)> RawUdpTunnelCallbackType;
+
 class MumbleClient {
 	enum State {
 		kStateNew,
@@ -45,8 +53,14 @@ class MumbleClient {
 
   public:
 	~MumbleClient();
-	void Connect();
-	void sendMessage(PbMessageType::MessageType type, const ::google::protobuf::Message& msg, bool print);
+	void Connect(const Settings& s);
+	void SendMessage(PbMessageType::MessageType type, const ::google::protobuf::Message& msg, bool print);
+	void SetComment(const std::string& text);
+	void SendRawUdpTunnel(const char* buffer, int32_t len);
+
+	void SetTextMessageCallback(TextMessageCallbackType tm) { text_message_callback_ = tm; };
+	void SetAuthCallback(AuthCallbackType a) { auth_callback_ = a; };
+	void SetRawUdpTunnelCallback(RawUdpTunnelCallbackType rut) { raw_udp_tunnel_callback_ = rut; };
 
   private:
 	friend class MumbleClientLib;
@@ -67,9 +81,16 @@ class MumbleClient {
 #endif
 	udp::socket* udp_socket_;
 	boost::asio::deadline_timer* ping_timer_;
+	int32_t session_;
+
+	TextMessageCallbackType text_message_callback_;
+	AuthCallbackType auth_callback_;
+	RawUdpTunnelCallbackType raw_udp_tunnel_callback_;
 
 	MumbleClient(const MumbleClient&);
 	void operator=(const MumbleClient&);
 };
+
+}  // end namespace MumbleClient
 
 #endif  // CLIENT_H_

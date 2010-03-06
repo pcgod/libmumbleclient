@@ -9,8 +9,8 @@
 
 #include "settings.h"
 
-using mumble_message::MessageHeader;
-using mumble_message::Message;
+using MumbleClient::mumble_message::MessageHeader;
+using MumbleClient::mumble_message::Message;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -31,6 +31,8 @@ template <class T> T ConstructProtobufObject(void* buffer, int32_t length, bool 
 }  // namespace
 
 
+namespace MumbleClient {
+
 ///////////////////////////////////////////////////////////////////////////////
 // MumbleClient, private:
 
@@ -45,7 +47,7 @@ void MumbleClient::DoPing(const boost::system::error_code& error) {
 
 	MumbleProto::Ping p;
 	p.set_timestamp(std::time(NULL));
-	sendMessage(PbMessageType::Ping, p, false);
+	SendMessage(PbMessageType::Ping, p, false);
 
 	// Requeue ping
 	if (!ping_timer_)
@@ -65,6 +67,12 @@ void MumbleClient::ParseMessage(const MessageHeader& msg_header, void* buffer) {
 		MumbleProto::Ping p = ConstructProtobufObject<MumbleProto::Ping>(buffer, msg_header.length, false);
 		break;
 	}
+	case PbMessageType::TextMessage: {
+		MumbleProto::TextMessage tm = ConstructProtobufObject<MumbleProto::TextMessage>(buffer, msg_header.length, true);
+
+		text_message_callback_(tm.message());
+		break;
+	}
 	case PbMessageType::CryptSetup: {
 		MumbleProto::CryptSetup cs = ConstructProtobufObject<MumbleProto::CryptSetup>(buffer, msg_header.length, true);
 		break;
@@ -76,15 +84,16 @@ void MumbleClient::ParseMessage(const MessageHeader& msg_header, void* buffer) {
 	case PbMessageType::ServerSync: {
 		MumbleProto::ServerSync ss = ConstructProtobufObject<MumbleProto::ServerSync>(buffer, msg_header.length, true);
 		state_ = kStateAuthenticated;
+		session_ = ss.session();
+
 		// Enqueue ping
 		DoPing(boost::system::error_code());
+
+		auth_callback_();
 		break;
 	}
 	case PbMessageType::UDPTunnel: {
-		std::fstream fs("udptunnel.out", std::fstream::app | std::fstream::out | std::fstream::binary);
-		fs.write(reinterpret_cast<const char *>(&msg_header.length), 4);
-		fs.write(reinterpret_cast<char *>(buffer), msg_header.length);
-		fs.close();
+		raw_udp_tunnel_callback_(msg_header.length, buffer);
 		break;
 	}
 	default:
@@ -121,12 +130,12 @@ MumbleClient::~MumbleClient() {
 	delete udp_socket_;
 }
 
-void MumbleClient::Connect() {
+void MumbleClient::Connect(const Settings& s) {
 	// Resolve hostname
-	std::cerr << "Resolving host " << Settings::getHost() << std::endl;
+	std::cerr << "Resolving host " << s.getHost() << std::endl;
 
 	tcp::resolver resolver(*io_service_);
-	tcp::resolver::query query(Settings::getHost(), Settings::getPort());
+	tcp::resolver::query query(s.getHost(), s.getPort());
 	tcp::resolver::iterator endpoint_iterator = resolver.resolve(query);
 	tcp::resolver::iterator end;
 
@@ -180,14 +189,14 @@ void MumbleClient::Connect() {
 	MumbleProto::Version v;
 	v.set_version(MUMBLE_VERSION(1, 2, 2));
 	v.set_release("0.0.1-dev");
-	sendMessage(PbMessageType::Version, v, true);
+	SendMessage(PbMessageType::Version, v, true);
 
 	MumbleProto::Authenticate a;
-	a.set_username(Settings::getUserName());
-	a.set_password(Settings::getPassword());
+	a.set_username(s.getUserName());
+	a.set_password(s.getPassword());
 	// FIXME: hardcoded version number
 	a.add_celt_versions(0x8000000b);
-	sendMessage(PbMessageType::Authenticate, a, true);
+	SendMessage(PbMessageType::Authenticate, a, true);
 
 	tcp_socket_->async_read_some(boost::asio::null_buffers(), boost::bind(&MumbleClient::ReadWriteHandler, this, boost::asio::placeholders::error));
 }
@@ -223,7 +232,7 @@ void MumbleClient::ReadWriteHandler(const boost::system::error_code& error) {
 	tcp_socket_->async_read_some(boost::asio::null_buffers(), boost::bind(&MumbleClient::ReadWriteHandler, this, boost::asio::placeholders::error));
 }
 
-void MumbleClient::sendMessage(PbMessageType::MessageType type, const ::google::protobuf::Message& new_msg, bool print) {
+void MumbleClient::SendMessage(PbMessageType::MessageType type, const ::google::protobuf::Message& new_msg, bool print) {
 	if (print) {
 		std::cout << "<< ENQUEUE: " << type << std::endl;
 		new_msg.PrintDebugString();
@@ -250,3 +259,22 @@ void MumbleClient::sendMessage(PbMessageType::MessageType type, const ::google::
 		std::cout << "<< ASYNC Type: " << ntohs(msg.header_.type) << " Length: 6+" << msg.msg_.size() << std::endl;
 	}
 }
+
+void MumbleClient::SetComment(const std::string& text) {
+	BOOST_ASSERT(state_ >= kStateAuthenticated);
+
+	MumbleProto::UserState us;
+	us.set_session(session_);
+	us.set_comment(text);
+
+	SendMessage(PbMessageType::UserState, us, true);
+}
+
+void MumbleClient::SendRawUdpTunnel(const char* buffer, int32_t len) {
+	MumbleProto::UDPTunnel ut;
+	ut.set_packet(buffer, len);
+
+	SendMessage(PbMessageType::UDPTunnel, ut, true);
+}
+
+}  // end namespace MumbleClient
