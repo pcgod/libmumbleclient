@@ -7,8 +7,10 @@
 #include <iostream>
 #include <typeinfo>
 
+#include "channel.h"
 #include "CryptState.h"
 #include "settings.h"
+#include "user.h"
 
 using MumbleClient::mumble_message::MessageHeader;
 using MumbleClient::mumble_message::Message;
@@ -62,10 +64,32 @@ void MumbleClient::ParseMessage(const MessageHeader& msg_header, void* buffer) {
 	switch (msg_header.type) {
 	case PbMessageType::Version: {
 		MumbleProto::Version v = ConstructProtobufObject<MumbleProto::Version>(buffer, msg_header.length, true);
+		// NOT_IMPLEMENTED
 		break;
 	}
 	case PbMessageType::Ping: {
 		MumbleProto::Ping p = ConstructProtobufObject<MumbleProto::Ping>(buffer, msg_header.length, false);
+		// NOT_IMPLEMENTED
+		break;
+	}
+	case PbMessageType::ChannelRemove: {
+		MumbleProto::ChannelRemove cr = ConstructProtobufObject<MumbleProto::ChannelRemove>(buffer, msg_header.length, true);
+		HandleChannelRemove(cr);
+		break;
+	}
+	case PbMessageType::ChannelState: {
+		MumbleProto::ChannelState cs = ConstructProtobufObject<MumbleProto::ChannelState>(buffer, msg_header.length, true);
+		HandleChannelState(cs);
+		break;
+	}
+	case PbMessageType::UserRemove: {
+		MumbleProto::UserRemove ur =ConstructProtobufObject<MumbleProto::UserRemove>(buffer, msg_header.length, true);
+		HandleUserRemove(ur);
+		break;
+	}
+	case PbMessageType::UserState: {
+		MumbleProto::UserState us = ConstructProtobufObject<MumbleProto::UserState>(buffer, msg_header.length, true);
+		HandleUserState(us);
 		break;
 	}
 	case PbMessageType::TextMessage: {
@@ -82,6 +106,7 @@ void MumbleClient::ParseMessage(const MessageHeader& msg_header, void* buffer) {
 	}
 	case PbMessageType::CodecVersion: {
 		MumbleProto::CodecVersion cv = ConstructProtobufObject<MumbleProto::CodecVersion>(buffer, msg_header.length, true);
+		// NOT_IMPLEMENTED
 		break;
 	}
 	case PbMessageType::ServerSync: {
@@ -105,6 +130,132 @@ void MumbleClient::ParseMessage(const MessageHeader& msg_header, void* buffer) {
 		std::cout << ">> IN: Unhandled message - Type: " << msg_header.type << " Length: " << msg_header.length << std::endl;
 	}
 }
+
+boost::ptr_vector<User>::iterator MumbleClient::FindUser(int32_t session) {
+	for (boost::ptr_vector<User>::iterator it = user_list_.begin(); it != user_list_.end(); ++it) {
+		if (it->session == session)
+			return it;
+	}
+
+	return user_list_.end();
+}
+
+boost::ptr_vector<Channel>::iterator MumbleClient::FindChannel(int32_t id) {
+	for (boost::ptr_vector<Channel>::iterator it = channel_list_.begin(); it != channel_list_.end(); ++it) {
+		if (it->id == id)
+			return it;
+	}
+
+	return channel_list_.end();
+}
+
+void MumbleClient::HandleUserRemove(const MumbleProto::UserRemove& ur) {
+	boost::ptr_vector<User>::iterator u = FindUser(ur.session());
+	assert(u != user_list_.end());
+
+	user_list_.erase(u);
+
+	if (user_left_callback_)
+		user_left_callback_(&*u);
+}
+
+void MumbleClient::HandleUserState(const MumbleProto::UserState& us) {
+	boost::ptr_vector<User>::iterator u = FindUser(us.session());
+	if (u == user_list_.end()) {
+		// New user
+		boost::ptr_vector<Channel>::iterator c = FindChannel(us.channel_id());
+		assert(c != channel_list_.end());
+
+		std::auto_ptr<User> nu(new User(us.session(), &*c));
+		nu->name = us.name();
+		if (us.has_hash())
+			nu->hash = us.hash();
+
+		std::cout << "New user " << nu->name << std::endl;
+		user_list_.push_back(nu);
+
+		if (user_joined_callback_) {
+			boost::ptr_vector<User>::iterator uc = FindUser(us.session());
+			user_joined_callback_(&*uc);
+		}
+
+		return;
+	}
+
+	std::cout << "Found user " << u->name << std::endl;
+	if (us.has_channel_id()) {
+		// Channel changed
+		boost::ptr_vector<Channel>::iterator c = FindChannel(us.channel_id());
+		assert(c != channel_list_.end());
+
+		Channel* oc = u->channel;
+		u->channel = &*c;
+
+		if (user_moved_callback_)
+			user_moved_callback_(&*u, oc);
+	}
+
+	if (us.has_comment()) {
+		u->comment = us.comment();
+		// user_comment_changed_callback_
+	}
+}
+
+void MumbleClient::HandleChannelRemove(const MumbleProto::ChannelRemove& cr) {
+	boost::ptr_vector<Channel>::iterator c = FindChannel(cr.channel_id());
+	assert(c != channel_list_.end());
+
+	channel_list_.erase(c);
+
+	if (channel_remove_callback_)
+		channel_remove_callback_(&*c);
+}
+
+void MumbleClient::HandleChannelState(const MumbleProto::ChannelState& cs) {
+	boost::ptr_vector<Channel>::iterator c = FindChannel(cs.channel_id());
+	if (c == channel_list_.end()) {
+		// New channel
+		std::auto_ptr<Channel> nc(new Channel(cs.channel_id()));
+		nc->name = cs.name();
+
+		if (cs.parent() != 0) {
+			boost::ptr_vector<Channel>::iterator p = FindChannel(cs.parent());
+			assert(p != channel_list_.end());
+			nc->parent = &*p;
+		}
+
+		std::cout << "New channel " << nc->name << std::endl;
+		channel_list_.push_back(nc);
+
+		if (channel_add_callback_) {
+			boost::ptr_vector<Channel>::iterator cc = FindChannel(cs.channel_id());
+			channel_add_callback_(&*cc);
+		}
+
+		return;
+	}
+
+	std::cout << "Found channel" << c->name << std::endl;
+}
+
+#ifndef NDEBUG
+void MumbleClient::PrintChannelList() {
+	std::cout << "-- Channel list --" << std::endl;
+	for (boost::ptr_vector<Channel>::iterator it = channel_list_.begin(); it != channel_list_.end(); ++it) {
+		std::cout << "Channel " << it->name << std::endl;
+	}
+	std::cout << "-- Channel list end --" << std::endl;
+}
+
+void MumbleClient::PrintUserList() {
+	std::cout << "-- User list --" << std::endl;
+	for (boost::ptr_vector<User>::iterator it = user_list_.begin(); it != user_list_.end(); ++it) {
+		std::cout << "User " << it->name << " on " << it->channel->name << std::endl;
+	}
+	std::cout << "-- User list end --" << std::endl;
+}
+#endif
+
 
 void MumbleClient::ProcessTCPSendQueue(const boost::system::error_code& error, const size_t /*bytes_transferred*/) {
 	if (!error) {

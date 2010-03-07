@@ -125,6 +125,12 @@ void TextMessageCallback(const std::string& message, MumbleClient::MumbleClient*
 	} else if (message == "stop") {
 		recording = false;
 		playback = false;
+#ifndef NDEBUG
+	} else if (message == "channellist") {
+		mc->PrintChannelList();
+	} else if (message == "userlist") {
+		mc->PrintUserList();
+#endif
 	} else if (message == "quit") {
 		mc->Disconnect();
 	}

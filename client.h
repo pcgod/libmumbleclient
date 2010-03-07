@@ -6,7 +6,7 @@
 #include <boost/asio.hpp>
 #include <boost/asio/ssl.hpp>
 #include <boost/ptr_container/ptr_deque.hpp>
-#include <deque>
+#include <boost/ptr_container/ptr_vector.hpp>
 
 #include "messages.h"
 #include "Mumble.pb.h"
@@ -19,8 +19,10 @@ using boost::asio::ssl::stream;
 
 #define SSL 1
 
+class Channel;
 class CryptState;
 class Settings;
+class User;
 
 namespace mumble_message {
 
@@ -45,6 +47,11 @@ struct Message {
 typedef boost::function<void (const std::string& text)> TextMessageCallbackType;
 typedef boost::function<void ()> AuthCallbackType;
 typedef boost::function<void (int32_t length, void* buffer)> RawUdpTunnelCallbackType;
+typedef boost::function<void (const User* user)> UserJoinedCallbackType;
+typedef boost::function<void (const User* user)> UserLeftCallbackType;
+typedef boost::function<void (const User* user, const Channel* channel)> UserMovedCallbackType;
+typedef boost::function<void (const Channel* channel)> ChannelAddCallbackType;
+typedef boost::function<void (const Channel* channel)> ChannelRemoveCallbackType;
 
 class MumbleClient {
 	enum State {
@@ -60,11 +67,21 @@ class MumbleClient {
 	void SendMessage(PbMessageType::MessageType type, const ::google::protobuf::Message& msg, bool print);
 	void SetComment(const std::string& text);
 	void SendRawUdpTunnel(const char* buffer, int32_t len);
+	void SendUdpMessage(const char* buffer, int32_t len);
 
 	void SetTextMessageCallback(TextMessageCallbackType tm) { text_message_callback_ = tm; }
 	void SetAuthCallback(AuthCallbackType a) { auth_callback_ = a; }
 	void SetRawUdpTunnelCallback(RawUdpTunnelCallbackType rut) { raw_udp_tunnel_callback_ = rut; }
-	void SendUdpMessage(const char* buffer, int32_t len);
+	void SetUserJoinedCallback(UserJoinedCallbackType ujt) { user_joined_callback_ = ujt; }
+	void SetUserLeftCallback(UserJoinedCallbackType ult) { user_left_callback_ = ult; }
+	void SetUserMovedCallback(UserMovedCallbackType umt) { user_moved_callback_ = umt; }
+	void SetChannelAddCallback(ChannelAddCallbackType cat) { channel_add_callback_ = cat; }
+	void SetChannelRemoveCallback(ChannelRemoveCallbackType crt) { channel_remove_callback_ = crt; }
+
+#ifndef NDEBUG
+	void PrintChannelList();
+	void PrintUserList();
+#endif
 
   private:
 	friend class MumbleClientLib;
@@ -75,6 +92,12 @@ class MumbleClient {
 	void ProcessTCPSendQueue(const boost::system::error_code& error, const size_t bytes_transferred);
 	void SendFirstQueued();
 	void ReadHandler(const boost::system::error_code& error);
+	void HandleUserRemove(const MumbleProto::UserRemove& ur);
+	void HandleUserState(const MumbleProto::UserState& us);
+	void HandleChannelState(const MumbleProto::ChannelState& cs);
+	void HandleChannelRemove(const MumbleProto::ChannelRemove& cr);
+	boost::ptr_vector<User>::iterator FindUser(int32_t session);
+	boost::ptr_vector<Channel>::iterator FindChannel(int32_t id);
 
 	boost::asio::io_service* io_service_;
 #if SSL
@@ -88,10 +111,17 @@ class MumbleClient {
 	State state_;
 	boost::asio::deadline_timer* ping_timer_;
 	int32_t session_;
+	boost::ptr_vector<User> user_list_;
+	boost::ptr_vector<Channel> channel_list_;
 
 	TextMessageCallbackType text_message_callback_;
 	AuthCallbackType auth_callback_;
 	RawUdpTunnelCallbackType raw_udp_tunnel_callback_;
+	UserJoinedCallbackType user_joined_callback_;
+	UserLeftCallbackType user_left_callback_;
+	UserMovedCallbackType user_moved_callback_;
+	ChannelAddCallbackType channel_add_callback_;
+	ChannelRemoveCallbackType channel_remove_callback_;
 
 	MumbleClient(const MumbleClient&);
 	void operator=(const MumbleClient&);
