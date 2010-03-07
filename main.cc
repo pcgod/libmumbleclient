@@ -161,4 +161,8 @@ int main(int /* argc */, char** /* argv[] */) {
 
 	// Start event loop
 	mcl->Run();
+	delete mc;
+
+	mcl->Shutdown();
+	mcl = NULL;
 }

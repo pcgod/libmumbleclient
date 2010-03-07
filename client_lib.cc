@@ -19,6 +19,7 @@ MumbleClientLib::MumbleClientLib() {
 }
 
 MumbleClientLib::~MumbleClientLib() {
+	delete instance_;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -39,6 +40,10 @@ MumbleClient* MumbleClientLib::NewClient() {
 
 void MumbleClientLib::Run() {
 	io_service_.run();
+}
+
+void MumbleClientLib::Shutdown() {
+	::google::protobuf::ShutdownProtobufLibrary();
 }
 
 }  // end namespace MumbleClient

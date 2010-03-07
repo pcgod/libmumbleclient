@@ -12,6 +12,7 @@ class MumbleClientLib {
 	static MumbleClientLib* instance();
 	MumbleClient* NewClient();
 	void Run();
+	void Shutdown();
 
   private:
 	MumbleClientLib();
