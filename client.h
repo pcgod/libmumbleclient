@@ -6,7 +6,7 @@
 #include <boost/asio.hpp>
 #include <boost/asio/ssl.hpp>
 #include <boost/ptr_container/ptr_deque.hpp>
-#include <boost/ptr_container/ptr_vector.hpp>
+#include <boost/shared_ptr.hpp>
 
 #include "messages.h"
 #include "Mumble.pb.h"
@@ -43,15 +43,17 @@ struct Message {
 
 }  // namespace mumble_message
 
+typedef std::list< boost::shared_ptr<User> >::iterator user_list_iterator;
+typedef std::list< boost::shared_ptr<Channel> >::iterator channel_list_iterator;
 
 typedef boost::function<void (const std::string& text)> TextMessageCallbackType;
 typedef boost::function<void ()> AuthCallbackType;
 typedef boost::function<void (int32_t length, void* buffer)> RawUdpTunnelCallbackType;
-typedef boost::function<void (const User* user)> UserJoinedCallbackType;
-typedef boost::function<void (const User* user)> UserLeftCallbackType;
-typedef boost::function<void (const User* user, const Channel* channel)> UserMovedCallbackType;
-typedef boost::function<void (const Channel* channel)> ChannelAddCallbackType;
-typedef boost::function<void (const Channel* channel)> ChannelRemoveCallbackType;
+typedef boost::function<void (const User& user)> UserJoinedCallbackType;
+typedef boost::function<void (const User& user)> UserLeftCallbackType;
+typedef boost::function<void (const User& user, const Channel& channel)> UserMovedCallbackType;
+typedef boost::function<void (const Channel& channel)> ChannelAddCallbackType;
+typedef boost::function<void (const Channel& channel)> ChannelRemoveCallbackType;
 
 class MumbleClient {
 	enum State {
@@ -96,8 +98,8 @@ class MumbleClient {
 	void HandleUserState(const MumbleProto::UserState& us);
 	void HandleChannelState(const MumbleProto::ChannelState& cs);
 	void HandleChannelRemove(const MumbleProto::ChannelRemove& cr);
-	boost::ptr_vector<User>::iterator FindUser(int32_t session);
-	boost::ptr_vector<Channel>::iterator FindChannel(int32_t id);
+	boost::shared_ptr<User> FindUser(int32_t session);
+	boost::shared_ptr<Channel> FindChannel(int32_t id);
 
 	boost::asio::io_service* io_service_;
 #if SSL
@@ -111,8 +113,8 @@ class MumbleClient {
 	State state_;
 	boost::asio::deadline_timer* ping_timer_;
 	int32_t session_;
-	boost::ptr_vector<User> user_list_;
-	boost::ptr_vector<Channel> channel_list_;
+	std::list< boost::shared_ptr<User> > user_list_;
+	std::list< boost::shared_ptr<Channel> > channel_list_;
 
 	TextMessageCallbackType text_message_callback_;
 	AuthCallbackType auth_callback_;

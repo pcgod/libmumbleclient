@@ -131,42 +131,42 @@ void MumbleClient::ParseMessage(const MessageHeader& msg_header, void* buffer) {
 	}
 }
 
-boost::ptr_vector<User>::iterator MumbleClient::FindUser(int32_t session) {
-	for (boost::ptr_vector<User>::iterator it = user_list_.begin(); it != user_list_.end(); ++it) {
-		if (it->session == session)
-			return it;
+boost::shared_ptr<User> MumbleClient::FindUser(int32_t session) {
+	for (user_list_iterator it = user_list_.begin(); it != user_list_.end(); ++it) {
+		if ((*it)->session == session)
+			return *it;
 	}
 
-	return user_list_.end();
+	return boost::shared_ptr<User>();
 }
 
-boost::ptr_vector<Channel>::iterator MumbleClient::FindChannel(int32_t id) {
-	for (boost::ptr_vector<Channel>::iterator it = channel_list_.begin(); it != channel_list_.end(); ++it) {
-		if (it->id == id)
-			return it;
+boost::shared_ptr<Channel> MumbleClient::FindChannel(int32_t id) {
+	for (channel_list_iterator it = channel_list_.begin(); it != channel_list_.end(); ++it) {
+		if ((*it)->id == id)
+			return *it;
 	}
 
-	return channel_list_.end();
+	return boost::shared_ptr<Channel>();
 }
 
 void MumbleClient::HandleUserRemove(const MumbleProto::UserRemove& ur) {
-	boost::ptr_vector<User>::iterator u = FindUser(ur.session());
-	assert(u != user_list_.end());
+	boost::shared_ptr<User> u = FindUser(ur.session());
+	assert(u);
 
-	user_list_.erase(u);
+	user_list_.remove(u);
 
 	if (user_left_callback_)
-		user_left_callback_(&*u);
+		user_left_callback_(*u);
 }
 
 void MumbleClient::HandleUserState(const MumbleProto::UserState& us) {
-	boost::ptr_vector<User>::iterator u = FindUser(us.session());
-	if (u == user_list_.end()) {
+	boost::shared_ptr<User> u = FindUser(us.session());
+	if (!u) {
 		// New user
-		boost::ptr_vector<Channel>::iterator c = FindChannel(us.channel_id());
-		assert(c != channel_list_.end());
+		boost::shared_ptr<Channel> c = FindChannel(us.channel_id());
+		assert(c);
 
-		std::auto_ptr<User> nu(new User(us.session(), &*c));
+		boost::shared_ptr<User> nu(new User(us.session(), c));
 		nu->name = us.name();
 		if (us.has_hash())
 			nu->hash = us.hash();
@@ -174,10 +174,8 @@ void MumbleClient::HandleUserState(const MumbleProto::UserState& us) {
 		std::cout << "New user " << nu->name << std::endl;
 		user_list_.push_back(nu);
 
-		if (user_joined_callback_) {
-			boost::ptr_vector<User>::iterator uc = FindUser(us.session());
-			user_joined_callback_(&*uc);
-		}
+		if (user_joined_callback_)
+			user_joined_callback_(*nu);
 
 		return;
 	}
@@ -185,14 +183,14 @@ void MumbleClient::HandleUserState(const MumbleProto::UserState& us) {
 	std::cout << "Found user " << u->name << std::endl;
 	if (us.has_channel_id()) {
 		// Channel changed
-		boost::ptr_vector<Channel>::iterator c = FindChannel(us.channel_id());
-		assert(c != channel_list_.end());
+		boost::shared_ptr<Channel> c = FindChannel(us.channel_id());
+		assert(c);
 
-		Channel* oc = u->channel;
-		u->channel = &*c;
+		boost::shared_ptr<Channel> oc = u->channel.lock();
+		u->channel = c;
 
 		if (user_moved_callback_)
-			user_moved_callback_(&*u, oc);
+			user_moved_callback_(*u, *oc);
 	}
 
 	if (us.has_comment()) {
@@ -202,35 +200,33 @@ void MumbleClient::HandleUserState(const MumbleProto::UserState& us) {
 }
 
 void MumbleClient::HandleChannelRemove(const MumbleProto::ChannelRemove& cr) {
-	boost::ptr_vector<Channel>::iterator c = FindChannel(cr.channel_id());
-	assert(c != channel_list_.end());
+	boost::shared_ptr<Channel> c = FindChannel(cr.channel_id());
+	assert(c);
 
-	channel_list_.erase(c);
+	channel_list_.remove(c);
 
 	if (channel_remove_callback_)
-		channel_remove_callback_(&*c);
+		channel_remove_callback_(*c);
 }
 
 void MumbleClient::HandleChannelState(const MumbleProto::ChannelState& cs) {
-	boost::ptr_vector<Channel>::iterator c = FindChannel(cs.channel_id());
-	if (c == channel_list_.end()) {
+	boost::shared_ptr<Channel> c = FindChannel(cs.channel_id());
+	if (!c) {
 		// New channel
-		std::auto_ptr<Channel> nc(new Channel(cs.channel_id()));
+		boost::shared_ptr<Channel> nc(new Channel(cs.channel_id()));
 		nc->name = cs.name();
 
 		if (cs.parent() != 0) {
-			boost::ptr_vector<Channel>::iterator p = FindChannel(cs.parent());
-			assert(p != channel_list_.end());
-			nc->parent = &*p;
+			boost::shared_ptr<Channel> p = FindChannel(cs.parent());
+			assert(p);
+			nc->parent = p;
 		}
 
 		std::cout << "New channel " << nc->name << std::endl;
 		channel_list_.push_back(nc);
 
-		if (channel_add_callback_) {
-			boost::ptr_vector<Channel>::iterator cc = FindChannel(cs.channel_id());
-			channel_add_callback_(&*cc);
-		}
+		if (channel_add_callback_)
+			channel_add_callback_(*nc);
 
 		return;
 	}
@@ -241,16 +237,16 @@ void MumbleClient::HandleChannelState(const MumbleProto::ChannelState& cs) {
 #ifndef NDEBUG
 void MumbleClient::PrintChannelList() {
 	std::cout << "-- Channel list --" << std::endl;
-	for (boost::ptr_vector<Channel>::iterator it = channel_list_.begin(); it != channel_list_.end(); ++it) {
-		std::cout << "Channel " << it->name << std::endl;
+	for (channel_list_iterator it = channel_list_.begin(); it != channel_list_.end(); ++it) {
+		std::cout << "Channel " << (*it)->name << std::endl;
 	}
 	std::cout << "-- Channel list end --" << std::endl;
 }
 
 void MumbleClient::PrintUserList() {
 	std::cout << "-- User list --" << std::endl;
-	for (boost::ptr_vector<User>::iterator it = user_list_.begin(); it != user_list_.end(); ++it) {
-		std::cout << "User " << it->name << " on " << it->channel->name << std::endl;
+	for (user_list_iterator it = user_list_.begin(); it != user_list_.end(); ++it) {
+		std::cout << "User " << (*it)->name << " on " << (*it)->channel.lock()->name << std::endl;
 	}
 	std::cout << "-- User list end --" << std::endl;
 }
