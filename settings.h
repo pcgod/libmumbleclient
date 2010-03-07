@@ -5,27 +5,30 @@ namespace MumbleClient {
 
 class Settings {
   public:
-	std::string getHost() const {
-		return "0xy.de";
-	}
+	Settings(const std::string& host, const std::string& port,
+			 const std::string& user_name, const std::string& password) :
+				host_(host),
+				port_(port),
+				user_name_(user_name),
+				password_(password) { }
 
-	std::string getPort() const {
-		return "64739";
-	}
+	std::string GetHost() const { return host_; }
+	std::string GetPort() const { return port_; }
+	std::string GetUserName() const { return user_name_; }
+	std::string GetPassword() const { return password_; }
 
-	std::string getUserName() const {
-		return "testBot";
-	}
+	void SetHost(const std::string& host) { host_ = host; }
+	void SetPort(const std::string& port) { port_ = port; }
+	void SetUserName(const std::string& user_name) { user_name_ = user_name; }
+	void SetPassword(const std::string& password) { password_ = password; }
 
-	std::string getPassword() const {
-		return "";
-	}
-/*
   private:
-	Settings();
+	std::string host_;
+	std::string port_;
+	std::string user_name_;
+	std::string password_;
 	Settings(const Settings&);
 	void operator=(const Settings&);
-*/
 };
 
 }  // end namespace MumbleClient

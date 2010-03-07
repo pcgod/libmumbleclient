@@ -132,10 +132,10 @@ MumbleClient::~MumbleClient() {
 
 void MumbleClient::Connect(const Settings& s) {
 	// Resolve hostname
-	std::cerr << "Resolving host " << s.getHost() << std::endl;
+	std::cerr << "Resolving host " << s.GetHost() << std::endl;
 
 	tcp::resolver resolver(*io_service_);
-	tcp::resolver::query query(s.getHost(), s.getPort());
+	tcp::resolver::query query(s.GetHost(), s.GetPort());
 	tcp::resolver::iterator endpoint_iterator = resolver.resolve(query);
 	tcp::resolver::iterator end;
 
@@ -188,13 +188,13 @@ void MumbleClient::Connect(const Settings& s) {
 	// Send initial messages
 	MumbleProto::Version v;
 	v.set_version(MUMBLE_VERSION(1, 2, 2));
-	v.set_release("0.0.1-dev");
+	v.set_release("libmumbleclient 0.0.1-dev");
 	SendMessage(PbMessageType::Version, v, true);
 
 	MumbleProto::Authenticate a;
-	a.set_username(s.getUserName());
-	a.set_password(s.getPassword());
-	// FIXME: hardcoded version number
+	a.set_username(s.GetUserName());
+	a.set_password(s.GetPassword());
+	// FIXME(pcgod): hardcoded version number
 	a.add_celt_versions(0x8000000b);
 	SendMessage(PbMessageType::Authenticate, a, true);
 

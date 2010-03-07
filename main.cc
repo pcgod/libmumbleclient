@@ -34,15 +34,17 @@ void RawUdpTunnelCallback(int32_t length, void* buffer) {
 
 int main(int /* argc */, char** /* argv[] */) {
 	MumbleClient::MumbleClientLib* mcl = MumbleClient::MumbleClientLib::instance();
-	MumbleClient::Settings s;
 
 	// Create a new client
 	MumbleClient::MumbleClient* mc = mcl->NewClient();
-	mc->Connect(s);
+	mc->Connect(MumbleClient::Settings("0xy.org", "64739", "testBot", ""));
 
 	mc->SetAuthCallback(boost::bind(&AuthCallback));
 	mc->SetTextMessageCallback(boost::bind(&TextMessageCallback, _1, mc));
 	mc->SetRawUdpTunnelCallback(boost::bind(&RawUdpTunnelCallback, _1, _2));
+
+//	MumbleClient::MumbleClient* mc2 = mcl->NewClient();
+//	mc2->Connect(MumbleClient::Settings("0xy.org", "64739", "testBot2", ""));
 
 	// Start event loop
 	mcl->Run();
