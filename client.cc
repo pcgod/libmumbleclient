@@ -184,11 +184,14 @@ void MumbleClient::Connect(const Settings& s) {
 	std::cout << "Handshake completed" << std::endl;
 	state_ = kStateHandshakeCompleted;
 
+	boost::asio::ip::tcp::no_delay no_delay_option(true);
 	boost::asio::socket_base::non_blocking_io nbio_command(true);
 #if SSL
 	tcp_socket_->lowest_layer().io_control(nbio_command);
+	tcp_socket_->lowest_layer().set_option(no_delay_option);
 #else
 	tcp_socket_->io_control(nbio_command);
+	tcp_socket_->set_option(no_delay_option);
 #endif
 
 	// Send initial messages
