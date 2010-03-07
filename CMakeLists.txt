@@ -16,6 +16,6 @@ include_directories(${Boost_INCLUDE_DIRS} ${OPENSSL_INCLUDE_DIR})
 
 PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS Mumble.proto)
 
-add_library(mumbleclient client.cc client_lib.cc ${PROTO_SRCS} ${PROTO_HDRS})
+add_library(mumbleclient client.cc client_lib.cc CryptState.cpp ${PROTO_SRCS} ${PROTO_HDRS})
 add_executable (main main.cc)
 target_link_libraries (main mumbleclient ${Boost_LIBRARIES} ${OPENSSL_LIBRARIES} ${PROTOBUF_LIBRARY})

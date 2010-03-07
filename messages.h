@@ -3,6 +3,15 @@
 
 namespace MumbleClient {
 
+namespace UdpMessageType {
+	enum MessageType {
+		UDPVoiceCELTAlpha,
+		UDPPing,
+		UDPVoiceSpeex,
+		UDPVoiceCELTBeta
+	};
+}  //end namespace UdpMessageType
+
 namespace PbMessageType {
 	enum MessageType {
 		Version,
@@ -31,7 +40,7 @@ namespace PbMessageType {
 		RequestBlob,
 		ServerConfig
 	};
-}
+}  // end namespace PbMessageType
 
 }  // end namespace MumbleClient
 

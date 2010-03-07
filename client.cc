@@ -7,6 +7,7 @@
 #include <iostream>
 #include <typeinfo>
 
+#include "CryptState.h"
 #include "settings.h"
 
 using MumbleClient::mumble_message::MessageHeader;
@@ -36,7 +37,7 @@ namespace MumbleClient {
 ///////////////////////////////////////////////////////////////////////////////
 // MumbleClient, private:
 
-MumbleClient::MumbleClient(boost::asio::io_service* io_service) : io_service_(io_service), state_(kStateNew), ping_timer_(NULL) {
+MumbleClient::MumbleClient(boost::asio::io_service* io_service) : io_service_(io_service), cs_(new CryptState()), state_(kStateNew), ping_timer_(NULL) {
 }
 
 void MumbleClient::DoPing(const boost::system::error_code& error) {
@@ -75,6 +76,7 @@ void MumbleClient::ParseMessage(const MessageHeader& msg_header, void* buffer) {
 	}
 	case PbMessageType::CryptSetup: {
 		MumbleProto::CryptSetup cs = ConstructProtobufObject<MumbleProto::CryptSetup>(buffer, msg_header.length, true);
+		cs_->setKey(cs.key().data(), cs.client_nonce().data(), cs.server_nonce().data());
 		break;
 	}
 	case PbMessageType::CodecVersion: {
@@ -128,6 +130,7 @@ MumbleClient::~MumbleClient() {
 	delete ping_timer_;
 	delete tcp_socket_;
 	delete udp_socket_;
+	delete cs_;
 }
 
 void MumbleClient::Connect(const Settings& s) {
@@ -163,7 +166,7 @@ void MumbleClient::Connect(const Settings& s) {
 	}
 
 #if SSL
-	udp::endpoint udp_endpoint((*endpoint_iterator).endpoint().address(), (*endpoint_iterator).endpoint().port());
+	udp::endpoint udp_endpoint(tcp_socket_->lowest_layer().remote_endpoint().address(), tcp_socket_->lowest_layer().remote_endpoint().port());
 	udp_socket_ = new udp::socket(*io_service_);
 	udp_socket_->connect(udp_endpoint, error);
 
@@ -260,6 +263,16 @@ void MumbleClient::SendMessage(PbMessageType::MessageType type, const ::google::
 	}
 }
 
+void MumbleClient::SendUdpMessage(const char* buffer, int32_t len) {
+	assert(cs_->isValid());
+
+	unsigned char* buf = static_cast<unsigned char *>(malloc(len + 4));
+	cs_->encrypt(reinterpret_cast<const unsigned char *>(buffer), buf, len);
+	udp_socket_->send(boost::asio::buffer(buf, len + 4));
+
+	free(buf);
+}
+
 void MumbleClient::SetComment(const std::string& text) {
 	BOOST_ASSERT(state_ >= kStateAuthenticated);
 
@@ -268,13 +281,6 @@ void MumbleClient::SetComment(const std::string& text) {
 	us.set_comment(text);
 
 	SendMessage(PbMessageType::UserState, us, true);
-}
-
-void MumbleClient::SendRawUdpTunnel(const char* buffer, int32_t len) {
-	MumbleProto::UDPTunnel ut;
-	ut.set_packet(buffer, len);
-
-	SendMessage(PbMessageType::UDPTunnel, ut, true);
 }
 
 }  // end namespace MumbleClient

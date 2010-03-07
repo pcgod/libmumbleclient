@@ -18,6 +18,7 @@ using boost::asio::ssl::stream;
 
 #define SSL 1
 
+class CryptState;
 class Settings;
 
 namespace mumble_message {
@@ -61,6 +62,7 @@ class MumbleClient {
 	void SetTextMessageCallback(TextMessageCallbackType tm) { text_message_callback_ = tm; };
 	void SetAuthCallback(AuthCallbackType a) { auth_callback_ = a; };
 	void SetRawUdpTunnelCallback(RawUdpTunnelCallbackType rut) { raw_udp_tunnel_callback_ = rut; };
+	void SendUdpMessage(const char* buffer, int32_t len);
 
   private:
 	friend class MumbleClientLib;
@@ -80,6 +82,7 @@ class MumbleClient {
 	tcp::socket* tcp_socket_;
 #endif
 	udp::socket* udp_socket_;
+	CryptState* cs_;
 	boost::asio::deadline_timer* ping_timer_;
 	int32_t session_;
 
