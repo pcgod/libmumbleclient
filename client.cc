@@ -71,7 +71,8 @@ void MumbleClient::ParseMessage(const MessageHeader& msg_header, void* buffer) {
 	case PbMessageType::TextMessage: {
 		MumbleProto::TextMessage tm = ConstructProtobufObject<MumbleProto::TextMessage>(buffer, msg_header.length, true);
 
-		text_message_callback_(tm.message());
+		if (text_message_callback_)
+			text_message_callback_(tm.message());
 		break;
 	}
 	case PbMessageType::CryptSetup: {
@@ -91,11 +92,13 @@ void MumbleClient::ParseMessage(const MessageHeader& msg_header, void* buffer) {
 		// Enqueue ping
 		DoPing(boost::system::error_code());
 
-		auth_callback_();
+		if (auth_callback_)
+			auth_callback_();
 		break;
 	}
 	case PbMessageType::UDPTunnel: {
-		raw_udp_tunnel_callback_(msg_header.length, buffer);
+		if (raw_udp_tunnel_callback_)
+			raw_udp_tunnel_callback_(msg_header.length, buffer);
 		break;
 	}
 	default:

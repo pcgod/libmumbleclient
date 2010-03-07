@@ -59,9 +59,9 @@ class MumbleClient {
 	void SetComment(const std::string& text);
 	void SendRawUdpTunnel(const char* buffer, int32_t len);
 
-	void SetTextMessageCallback(TextMessageCallbackType tm) { text_message_callback_ = tm; };
-	void SetAuthCallback(AuthCallbackType a) { auth_callback_ = a; };
-	void SetRawUdpTunnelCallback(RawUdpTunnelCallbackType rut) { raw_udp_tunnel_callback_ = rut; };
+	void SetTextMessageCallback(TextMessageCallbackType tm) { text_message_callback_ = tm; }
+	void SetAuthCallback(AuthCallbackType a) { auth_callback_ = a; }
+	void SetRawUdpTunnelCallback(RawUdpTunnelCallbackType rut) { raw_udp_tunnel_callback_ = rut; }
 	void SendUdpMessage(const char* buffer, int32_t len);
 
   private:
