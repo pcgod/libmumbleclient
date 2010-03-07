@@ -4,7 +4,7 @@ set (libmumbleclient_VERSION_MAJOR 0)
 set (libmumbleclient_VERSION_MINOR 0)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
-find_package(Boost 1.38.0 REQUIRED COMPONENTS system)
+find_package(Boost 1.38.0 REQUIRED COMPONENTS system thread)
 find_package(OpenSSL REQUIRED)
 find_package(Protobuf REQUIRED)
 
