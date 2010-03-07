@@ -5,6 +5,7 @@
 
 #include <boost/asio.hpp>
 #include <boost/asio/ssl.hpp>
+#include <boost/ptr_container/ptr_deque.hpp>
 #include <deque>
 
 #include "messages.h"
@@ -55,6 +56,7 @@ class MumbleClient {
   public:
 	~MumbleClient();
 	void Connect(const Settings& s);
+	void Disconnect();
 	void SendMessage(PbMessageType::MessageType type, const ::google::protobuf::Message& msg, bool print);
 	void SetComment(const std::string& text);
 	void SendRawUdpTunnel(const char* buffer, int32_t len);
@@ -71,11 +73,10 @@ class MumbleClient {
 	void DoPing(const boost::system::error_code& error);
 	void ParseMessage(const mumble_message::MessageHeader& msg_header, void* buffer);
 	void ProcessTCPSendQueue(const boost::system::error_code& error, const size_t bytes_transferred);
-	void ReadWriteHandler(const boost::system::error_code& error);
+	void SendFirstQueued();
+	void ReadHandler(const boost::system::error_code& error);
 
 	boost::asio::io_service* io_service_;
-	std::deque<mumble_message::Message> send_queue_;
-	State state_;
 #if SSL
 	stream<tcp::socket>* tcp_socket_;
 #else
@@ -83,6 +84,8 @@ class MumbleClient {
 #endif
 	udp::socket* udp_socket_;
 	CryptState* cs_;
+	boost::ptr_deque<mumble_message::Message> send_queue_;
+	State state_;
 	boost::asio::deadline_timer* ping_timer_;
 	int32_t session_;
 
