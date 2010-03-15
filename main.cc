@@ -20,7 +20,7 @@ static const int32_t kSampleRate = 48000;
 bool recording = false;
 bool playback = false;
 
-boost::thread *playback_thread = NULL;
+static boost::thread *playback_thread = NULL;
 
 static inline int32_t pds_int_len(char* x) {
 	if ((x[0] & 0x80) == 0x00) {
@@ -31,19 +31,14 @@ static inline int32_t pds_int_len(char* x) {
 		switch (x[0] & 0xFC) {
 			case 0xF0:
 				return 5;
-				break;
 			case 0xF4:
 				return 9;
-				break;
 			case 0xF8:
 				return pds_int_len(&x[1]) + 1;
-				break;
 			case 0xFC:
 				return 1;
-				break;
 			default:
 				return 1;
-				break;
 		}
 	} else if ((x[0] & 0xF0) == 0xE0) {
 		return 3;

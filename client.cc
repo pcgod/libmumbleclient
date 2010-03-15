@@ -393,6 +393,8 @@ void MumbleClient::Disconnect() {
 	if (ping_timer_)
 		ping_timer_->cancel();
 	send_queue_.clear();
+	user_list_.clear();
+	channel_list_.clear();
 
 	tcp_socket_->lowest_layer().cancel();
 	tcp_socket_->lowest_layer().close();
