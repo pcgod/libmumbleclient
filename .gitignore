@@ -1,4 +1,5 @@
-*.db
+*.a
+*.so
 *.pb.*
 *.cmake
 Makefile
@@ -6,3 +7,4 @@ main
 pkcs11.txt
 CMakeCache.txt
 CMakeFiles/*
+celt-build/CMakeFiles/*

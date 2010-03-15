@@ -1,3 +1,8 @@
+#include "celt.h"
+#ifdef WITH_MPG123
+#include <mpg123.h>
+#endif
+
 #include <iostream>
 #include <fstream>
 #include <boost/thread.hpp>
@@ -6,7 +11,11 @@
 #include "client_lib.h"
 #include "CryptState.h"
 #include "messages.h"
+#include "PacketDataStream.h"
 #include "settings.h"
+
+// Always 48000 for Mumble
+static const int32_t kSampleRate = 48000;
 
 bool recording = false;
 bool playback = false;
@@ -110,6 +119,114 @@ void playbackFunction(MumbleClient::MumbleClient* mc) {
 	std::cout << ">> playback thread" << std::endl;
 }
 
+#ifdef WITH_MPG123
+void playMp3(MumbleClient::MumbleClient* mc) {
+	std::cout << "<< play mp3 thread" << std::endl;
+
+//	struct sched_param param;
+//	param.sched_priority = 1;
+//	pthread_setschedparam(pthread_self(), SCHED_FIFO, &param);
+
+	// FIXME(pcgod): 1-6 to match Mumble client
+	int frames = 6;
+//	int audio_quality = 96000;
+	int audio_quality = 60000;
+
+	int err = mpg123_init();
+	mpg123_handle *mh = mpg123_new(NULL, &err);
+	mpg123_param(mh, MPG123_VERBOSE, 255, 0);
+	mpg123_param(mh, MPG123_RVA, MPG123_RVA_MIX, 0);
+	mpg123_param(mh, MPG123_ADD_FLAGS, MPG123_MONO_MIX, 0);
+	mpg123_param(mh, MPG123_FORCE_RATE, kSampleRate, 0);
+	mpg123_open(mh, "<file>");
+
+	long rate = 0;
+	int channels = 0, encoding = 0;
+	mpg123_getformat(mh, &rate, &channels, &encoding);
+	mpg123_format_none(mh);
+
+	rate = kSampleRate;
+	channels = MPG123_MONO;
+	err = mpg123_format(mh, rate, channels, encoding);
+
+	// FIXME(pcgod): maybe broken for mono MP3s
+	size_t buffer_size = (kSampleRate / 100) * 2/* * channels*/;
+
+	CELTMode *cmMode = celt_mode_create(kSampleRate, kSampleRate / 100, NULL);
+	CELTEncoder *ce = celt_encoder_create(cmMode, 1, NULL);
+
+	celt_encoder_ctl(ce, CELT_SET_PREDICTION(0));
+	celt_encoder_ctl(ce, CELT_SET_VBR_RATE(audio_quality));
+
+	std::deque<std::string> packet_list;
+
+	std::cout << "decoding..." << std::endl;
+	unsigned char* buffer = static_cast<unsigned char *>(malloc(buffer_size));
+	do {
+		size_t done = 0;
+		unsigned char out[512];
+
+		err = mpg123_read(mh, buffer, buffer_size, &done);
+		int32_t len = celt_encode(ce, reinterpret_cast<short *>(buffer), NULL, out, std::min(audio_quality / (100 * 8), 127));
+		// std::cout << (done / sizeof(short)) << " samples - bitrate: " << (len * 100 * 8) << std::endl;
+
+		packet_list.push_back(std::string(reinterpret_cast<char *>(out), len));
+	} while (err == MPG123_OK);
+
+	if (err != MPG123_DONE)
+		std::cerr << "Warning: Decoding ended prematurely because: " << (err == MPG123_ERR ? mpg123_strerror(mh) : mpg123_plain_strerror(err)) << std::endl;
+
+	std::cout << "finished decoding" << std::endl;
+
+	free(buffer);
+	celt_encoder_destroy(ce);
+	celt_mode_destroy(cmMode);
+	mpg123_close(mh);
+	mpg123_delete(mh);
+	mpg123_exit();
+
+
+	int32_t seq = 0;
+	while (playback && !packet_list.empty()) {
+		// build pds
+		char data[1024];
+		int flags = 0; // target = 0
+		flags |= (MumbleClient::UdpMessageType::UDPVoiceCELTAlpha << 5);
+		data[0] = static_cast<unsigned char>(flags);
+
+		PacketDataStream pds(data + 1, 1023);
+		seq += frames;
+		pds << seq;
+		// Append |frames| frames to pds
+		for (int i = 0; i < frames; ++i) {
+			if (packet_list.empty()) break;
+			const std::string& s = packet_list.front();
+
+			unsigned char head = s.size();
+			// Add 0x80 to all but the last frame
+			if (i < frames - 1)
+				head |= 0x80;
+
+			pds.append(head);
+			pds.append(s);
+
+			packet_list.pop_front();
+		}
+
+#define TCP 0
+#if TCP
+		mc->SendRawUdpTunnel(data, pds.size() + 1);
+#else
+		mc->SendUdpMessage(data, pds.size() + 1);
+#endif
+		boost::this_thread::sleep(boost::posix_time::milliseconds((frames) * 10));
+	}
+
+	playback = false;
+	std::cout << ">> play mp3 thread" << std::endl;
+}
+#endif
+
 void AuthCallback() {
 	std::cout << "I'm authenticated" << std::endl;
 }
@@ -122,6 +239,13 @@ void TextMessageCallback(const std::string& message, MumbleClient::MumbleClient*
 			playback = true;
 			playback_thread = new boost::thread(playbackFunction, mc);
 		}
+#ifdef WITH_MPG123
+	} else if (message == "playmp3") {
+		if (playback == false) {
+			playback = true;
+			playback_thread = new boost::thread(playMp3, mc);
+		}
+#endif
 	} else if (message == "stop") {
 		recording = false;
 		playback = false;
@@ -164,6 +288,8 @@ int main(int /* argc */, char** /* argv[] */) {
 
 //	MumbleClient::MumbleClient* mc2 = mcl->NewClient();
 //	mc2->Connect(MumbleClient::Settings("0xy.org", "64739", "testBot2", ""));
+//	mc2->SetTextMessageCallback(boost::bind(&TextMessageCallback, _1, mc2));
+//	mc2->SetRawUdpTunnelCallback(boost::bind(&RawUdpTunnelCallback, _1, _2));
 
 	// Start event loop
 	mcl->Run();
