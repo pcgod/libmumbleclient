@@ -5,7 +5,6 @@
 
 #include <boost/asio.hpp>
 #include <boost/asio/ssl.hpp>
-#include <boost/ptr_container/ptr_deque.hpp>
 #include <boost/shared_ptr.hpp>
 
 #include "messages.h"
@@ -109,7 +108,7 @@ class MumbleClient {
 #endif
 	udp::socket* udp_socket_;
 	CryptState* cs_;
-	boost::ptr_deque<mumble_message::Message> send_queue_;
+	std::deque< boost::shared_ptr<mumble_message::Message> > send_queue_;
 	State state_;
 	boost::asio::deadline_timer* ping_timer_;
 	int32_t session_;

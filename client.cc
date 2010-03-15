@@ -267,14 +267,14 @@ void MumbleClient::ProcessTCPSendQueue(const boost::system::error_code& error, c
 }
 
 void MumbleClient::SendFirstQueued() {
-	Message& msg = send_queue_.front();
+	boost::shared_ptr<Message>& msg = send_queue_.front();
 
 	std::vector<boost::asio::const_buffer> bufs;
-	bufs.push_back(boost::asio::buffer(reinterpret_cast<char *>(&msg.header_), sizeof(msg.header_)));
-	bufs.push_back(boost::asio::buffer(msg.msg_, msg.msg_.size()));
+	bufs.push_back(boost::asio::buffer(reinterpret_cast<char *>(&msg->header_), sizeof(msg->header_)));
+	bufs.push_back(boost::asio::buffer(msg->msg_, msg->msg_.size()));
 
 	async_write(*tcp_socket_, bufs, boost::bind(&MumbleClient::ProcessTCPSendQueue, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
-	std::cout << "<< ASYNC Type: " << ntohs(msg.header_.type) << " Length: 6+" << msg.msg_.size() << std::endl;
+	std::cout << "<< ASYNC Type: " << ntohs(msg->header_.type) << " Length: 6+" << msg->msg_.size() << std::endl;
 }
 
 void MumbleClient::ReadHandler(const boost::system::error_code& error) {
@@ -420,7 +420,8 @@ void MumbleClient::SendMessage(PbMessageType::MessageType type, const ::google::
 	msg_header.length = htonl(length);
 
 	std::string pb_message = new_msg.SerializeAsString();
-	send_queue_.push_back(new Message(msg_header, pb_message));
+	boost::shared_ptr<Message> m(new Message(msg_header, pb_message));
+	send_queue_.push_back(m);
 
 	if (state_ >= kStateHandshakeCompleted && !write_in_progress) {
 		SendFirstQueued();
@@ -433,8 +434,9 @@ void MumbleClient::SendRawUdpTunnel(const char* buffer, int32_t len) {
 	msg_header.type = htons(static_cast<int16_t>(PbMessageType::UDPTunnel));
 	msg_header.length = htonl(len);
 
-	std::string m(buffer, len);
-	send_queue_.push_back(new Message(msg_header, m));
+	std::string data(buffer, len);
+	boost::shared_ptr<Message> m(new Message(msg_header, data));
+	send_queue_.push_back(m);
 
 	if (state_ >= kStateHandshakeCompleted && !write_in_progress) {
 		SendFirstQueued();
