@@ -1,0 +1,17 @@
+// Control channel packet layout:
+//
+// +------------------------+
+// |          Type          |
+// |       (2 bytes)        |
+// +------------------------+
+// |                        |
+// |         Length         |
+// |       (4 bytes)        |
+// |                        |
+// +------------------------+
+// |        Protobuf        |
+// |         Message        |
+// |    (<length> bytes)    |
+// +------------------------+
+//
+// Type: Type of the protobuf message (see messages.h)

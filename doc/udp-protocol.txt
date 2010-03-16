@@ -1,0 +1,67 @@
+// UDP ping layout:
+//
+// +------------------------+
+// | type / flags           |
+// +------------------------+
+// | varint timestamp       |
+// +------------------------+
+//
+//
+// Voice packet layout:
+//
+// +------------------------+
+// | type / flags           |
+// +------------------------+
+// | varint uiSession       |
+// +------------------------+
+// | varint sequence number |
+// +------------------------+
+//
+//          repeated
+// +------------------------+
+// |         header         |
+// +------------------------+
+// |          data          |
+// +------------------------+
+//
+// If positional audio:
+// +------------------------+
+// | float Pos 1 (pds enc)  |
+// +------------------------+
+// | float Pos 2 (pds enc)  |
+// +------------------------+
+// | float Pos 3 (pds enc)  |
+// +------------------------+
+//
+//
+// Type / Flags layout (1 byte):
+// Bits 1-3: Type (Mask: 0xe0 / (>> 5) & 0x7)   | 1110 0000
+// Bits 4-8: Flags (Mask: 0x1f) | 0001 1111
+//
+// Type:
+// 0 -> UDPVoiceCELTAlpha
+// 1 -> UDPPing
+// 2 -> UDPVoiceSpeex
+// 3 -> UDPVoiceCELTBeta
+//
+// Flags (5 bits): (voice only)
+// Target (Mask 0x1f -> 0001 1111)
+// 0 -> Talking
+// 1 -> Whisper to channel
+// 2-30 -> Direct whisper (always 2 for incoming, voice target nr for outgoing)
+// 31 -> Server loopback
+//
+// Header layout:
+// Bit 1:    Terminator flag (Mask 0x80) | 1000 0000
+// Bits 2-8: Data length (Mask 0x7f)     | 0111 1111
+//
+// Varint:
+// 0xxx xxxx -> 1: 0xxx xxxx (<= 127 / 0x7f)
+// 10xx xxxx -> 1: 0xxx xxxx | 2: xxxx xxxx (<= 255 / 0xffff)
+// 1111 xxxx ->
+//      00xx -> 1: << 24 | 2: << 16 | 3: << 8 | 4:   (<= 16.777.215 / 0xFFFFFF)
+//      01xx -> 1: << 56 | 2: << 48 | 3: << 40 | 4: << 32 | 5: << 24 | 6: << 16 | 7: << 8 | 8: (64bit number)
+//      10xx -> negative number (do varint with the next byte)
+//      11xx -> -xx (small negative number)
+// 1110 xxxx -> 1: xxxx << 24 | 2: << 16 | 3: << 8 | 4: (< 4.294.967.295)
+// 110x xxxx -> 1: x xxxx << 16 | 2: << 8 | 3: (< 2.097.151 / 0x1fffff)
