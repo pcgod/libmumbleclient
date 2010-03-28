@@ -3,11 +3,13 @@
 
 #include <boost/asio.hpp>
 
+#include "visibility.h"
+
 namespace MumbleClient {
 
 class MumbleClient;
 
-class MumbleClientLib {
+class DLL_PUBLIC MumbleClientLib {
   public:
 	static MumbleClientLib* instance();
 	MumbleClient* NewClient();
@@ -15,10 +17,10 @@ class MumbleClientLib {
 	void Shutdown();
 
   private:
-	MumbleClientLib();
-	~MumbleClientLib();
+	DLL_LOCAL MumbleClientLib();
+	DLL_LOCAL ~MumbleClientLib();
 
-	static MumbleClientLib* instance_;
+	DLL_LOCAL static MumbleClientLib* instance_;
 	boost::asio::io_service io_service_;
 
 	MumbleClientLib(const MumbleClientLib&);

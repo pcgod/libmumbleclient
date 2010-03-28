@@ -12,6 +12,7 @@ libmumbleclient is library that should be able to act as a client for a [Mumble]
 ## Important missing parts
 
 * UDP ping
+* UDP audio recieving
 * Crypt resync
 * more complete user/channel handling
 * lots of callbacks...

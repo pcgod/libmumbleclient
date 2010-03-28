@@ -58,10 +58,10 @@
 // Varint:
 // 0xxx xxxx -> 1: 0xxx xxxx (<= 127 / 0x7f)
 // 10xx xxxx -> 1: 0xxx xxxx | 2: xxxx xxxx (<= 255 / 0xffff)
+// 110x xxxx -> 1: x xxxx << 16 | 2: << 8 | 3: (< 2.097.151 / 0x1fffff)
+// 1110 xxxx -> 1: xxxx << 24 | 2: << 16 | 3: << 8 | 4: (< 4.294.967.295)
 // 1111 xxxx ->
 //      00xx -> 1: << 24 | 2: << 16 | 3: << 8 | 4:   (<= 16.777.215 / 0xFFFFFF)
 //      01xx -> 1: << 56 | 2: << 48 | 3: << 40 | 4: << 32 | 5: << 24 | 6: << 16 | 7: << 8 | 8: (64bit number)
 //      10xx -> negative number (do varint with the next byte)
 //      11xx -> -xx (small negative number)
-// 1110 xxxx -> 1: xxxx << 24 | 2: << 16 | 3: << 8 | 4: (< 4.294.967.295)
-// 110x xxxx -> 1: x xxxx << 16 | 2: << 8 | 3: (< 2.097.151 / 0x1fffff)

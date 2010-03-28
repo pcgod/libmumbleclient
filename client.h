@@ -9,6 +9,7 @@
 
 #include "messages.h"
 #include "Mumble.pb.h"
+#include "visibility.h"
 
 namespace MumbleClient {
 
@@ -54,7 +55,7 @@ typedef boost::function<void (const User& user, const Channel& channel)> UserMov
 typedef boost::function<void (const Channel& channel)> ChannelAddCallbackType;
 typedef boost::function<void (const Channel& channel)> ChannelRemoveCallbackType;
 
-class MumbleClient {
+class DLL_PUBLIC MumbleClient {
 	enum State {
 		kStateNew,
 		kStateHandshakeCompleted,
@@ -86,19 +87,19 @@ class MumbleClient {
 
   private:
 	friend class MumbleClientLib;
-	MumbleClient(boost::asio::io_service* io_service);
+	DLL_LOCAL MumbleClient(boost::asio::io_service* io_service);
 
-	void DoPing(const boost::system::error_code& error);
-	void ParseMessage(const mumble_message::MessageHeader& msg_header, void* buffer);
-	void ProcessTCPSendQueue(const boost::system::error_code& error, const size_t bytes_transferred);
-	void SendFirstQueued();
-	void ReadHandler(const boost::system::error_code& error);
-	void HandleUserRemove(const MumbleProto::UserRemove& ur);
-	void HandleUserState(const MumbleProto::UserState& us);
-	void HandleChannelState(const MumbleProto::ChannelState& cs);
-	void HandleChannelRemove(const MumbleProto::ChannelRemove& cr);
-	boost::shared_ptr<User> FindUser(int32_t session);
-	boost::shared_ptr<Channel> FindChannel(int32_t id);
+	DLL_LOCAL void DoPing(const boost::system::error_code& error);
+	DLL_LOCAL void ParseMessage(const mumble_message::MessageHeader& msg_header, void* buffer);
+	DLL_LOCAL void ProcessTCPSendQueue(const boost::system::error_code& error, const size_t bytes_transferred);
+	DLL_LOCAL void SendFirstQueued();
+	DLL_LOCAL void ReadHandler(const boost::system::error_code& error);
+	DLL_LOCAL void HandleUserRemove(const MumbleProto::UserRemove& ur);
+	DLL_LOCAL void HandleUserState(const MumbleProto::UserState& us);
+	DLL_LOCAL void HandleChannelState(const MumbleProto::ChannelState& cs);
+	DLL_LOCAL void HandleChannelRemove(const MumbleProto::ChannelRemove& cr);
+	DLL_LOCAL boost::shared_ptr<User> FindUser(int32_t session);
+	DLL_LOCAL boost::shared_ptr<Channel> FindChannel(int32_t id);
 
 	boost::asio::io_service* io_service_;
 #if SSL
@@ -124,8 +125,8 @@ class MumbleClient {
 	ChannelAddCallbackType channel_add_callback_;
 	ChannelRemoveCallbackType channel_remove_callback_;
 
-	MumbleClient(const MumbleClient&);
-	void operator=(const MumbleClient&);
+	DLL_LOCAL MumbleClient(const MumbleClient&);
+	DLL_LOCAL void operator=(const MumbleClient&);
 };
 
 }  // end namespace MumbleClient

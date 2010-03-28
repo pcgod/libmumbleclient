@@ -17,8 +17,8 @@
 // Always 48000 for Mumble
 static const int32_t kSampleRate = 48000;
 
-bool recording = false;
-bool playback = false;
+static bool recording = false;
+static bool playback = false;
 
 static boost::thread *playback_thread = NULL;
 
@@ -276,9 +276,9 @@ struct RelayMessage {
 	RelayMessage(MumbleClient::MumbleClient* mc_, const std::string& message_) : mc(mc_), message(message_) { }
 };
 
-boost::condition_variable cond;
-boost::mutex mut;
-std::deque< boost::shared_ptr<RelayMessage> > relay_queue;
+static boost::condition_variable cond;
+static boost::mutex mut;
+static std::deque< boost::shared_ptr<RelayMessage> > relay_queue;
 
 void RelayThread() {
 	boost::unique_lock<boost::mutex> lock(mut);

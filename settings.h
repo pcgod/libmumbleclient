@@ -3,7 +3,7 @@
 
 namespace MumbleClient {
 
-class Settings {
+class DLL_PUBLIC Settings {
   public:
 	Settings(const std::string& host, const std::string& port,
 			 const std::string& user_name, const std::string& password) :
@@ -27,8 +27,8 @@ class Settings {
 	std::string port_;
 	std::string user_name_;
 	std::string password_;
-	Settings(const Settings&);
-	void operator=(const Settings&);
+	DLL_LOCAL Settings(const Settings&);
+	DLL_LOCAL void operator=(const Settings&);
 };
 
 }  // end namespace MumbleClient

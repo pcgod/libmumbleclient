@@ -19,8 +19,9 @@ if (NOT CELT_FOUND)
 endif()
 
 SET(CMAKE_BUILD_TYPE Debug)
-SET(CMAKE_C_FLAGS_DEBUG "-g -Wall -Wextra -pedantic -Wfatal-errors -Wshadow")
-SET(CMAKE_CXX_FLAGS_DEBUG "-g -Wall -Wextra -Wfatal-errors -Wshadow -Woverloaded-virtual -Wold-style-cast")
+SET(COMMON_CFLAGS "-g -Wall -Wextra -Wfatal-errors -Wshadow -fvisibility=hidden -fvisibility-inlines-hidden")
+SET(CMAKE_C_FLAGS_DEBUG  "${COMMON_CFLAGS} -pedantic")
+SET(CMAKE_CXX_FLAGS_DEBUG "${COMMON_CFLAGS} -Woverloaded-virtual -Wold-style-cast")
 
 include_directories(${Boost_INCLUDE_DIRS} ${OPENSSL_INCLUDE_DIR} ${CELT_INCLUDE_DIR})
 
