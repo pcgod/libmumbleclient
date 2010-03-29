@@ -31,14 +31,14 @@ namespace mumble_message {
 struct MessageHeader {
 	int16_t type;
 	int32_t length;
-} /*__attribute__((packed))*/;
+};
 #pragma pack(pop)
 
 struct Message {
 	MessageHeader header_;
 	std::string msg_;
 
-	Message(MessageHeader& header, std::string& msg) : header_(header), msg_(msg) {};
+	Message(const MessageHeader& header, const std::string& msg) : header_(header), msg_(msg) {};
 };
 
 }  // namespace mumble_message

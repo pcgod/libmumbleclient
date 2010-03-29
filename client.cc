@@ -1,7 +1,7 @@
 #include "client.h"
 
-#include <boost/array.hpp>
 #include <boost/asio.hpp>
+#include <boost/make_shared.hpp>
 #include <deque>
 #include <fstream>
 #include <iostream>
@@ -175,7 +175,7 @@ void MumbleClient::HandleUserState(const MumbleProto::UserState& us) {
 		boost::shared_ptr<Channel> c = FindChannel(us.channel_id());
 		assert(c);
 
-		boost::shared_ptr<User> nu(new User(us.session(), c));
+		boost::shared_ptr<User> nu = boost::make_shared<User>(us.session(), c);
 		nu->name = us.name();
 		if (us.has_hash())
 			nu->hash = us.hash();
@@ -222,7 +222,7 @@ void MumbleClient::HandleChannelState(const MumbleProto::ChannelState& cs) {
 	boost::shared_ptr<Channel> c = FindChannel(cs.channel_id());
 	if (!c) {
 		// New channel
-		boost::shared_ptr<Channel> nc(new Channel(cs.channel_id()));
+		boost::shared_ptr<Channel> nc = boost::make_shared<Channel>(cs.channel_id());
 		nc->name = cs.name();
 
 		if (cs.parent() != 0) {
@@ -431,7 +431,7 @@ void MumbleClient::SendMessage(PbMessageType::MessageType type, const ::google::
 	msg_header.length = htonl(length);
 
 	std::string pb_message = new_msg.SerializeAsString();
-	boost::shared_ptr<Message> m(new Message(msg_header, pb_message));
+	boost::shared_ptr<Message> m = boost::make_shared<Message>(msg_header, pb_message);
 	send_queue_.push_back(m);
 
 	if (state_ >= kStateHandshakeCompleted && !write_in_progress) {
@@ -446,7 +446,7 @@ void MumbleClient::SendRawUdpTunnel(const char* buffer, int32_t len) {
 	msg_header.length = htonl(len);
 
 	std::string data(buffer, len);
-	boost::shared_ptr<Message> m(new Message(msg_header, data));
+	boost::shared_ptr<Message> m = boost::make_shared<Message>(msg_header, data);
 	send_queue_.push_back(m);
 
 	if (state_ >= kStateHandshakeCompleted && !write_in_progress) {
