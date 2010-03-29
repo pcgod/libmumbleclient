@@ -101,7 +101,16 @@ void MumbleClient::ParseMessage(const MessageHeader& msg_header, void* buffer) {
 	}
 	case PbMessageType::CryptSetup: {
 		MumbleProto::CryptSetup cs = ConstructProtobufObject<MumbleProto::CryptSetup>(buffer, msg_header.length, true);
-		cs_->setKey(cs.key().data(), cs.client_nonce().data(), cs.server_nonce().data());
+		if (cs.has_key() && cs.has_client_nonce() && cs.has_server_nonce()) {
+			cs_->setKey(reinterpret_cast<const unsigned char *>(cs.key().data()), reinterpret_cast<const unsigned char *>(cs.client_nonce().data()), reinterpret_cast<const unsigned char *>(cs.server_nonce().data()));
+		} else if (cs.has_server_nonce()) {
+			std::cout << "Crypt resync" << std::endl;
+			cs_->setDecryptIV(reinterpret_cast<const unsigned char *>(cs.server_nonce().data()));
+		} else {
+			cs.Clear();
+			cs.set_client_nonce(reinterpret_cast<const char *>(cs_->getEncryptIV()));
+			SendMessage(PbMessageType::CryptSetup, cs, true);
+		}
 		break;
 	}
 	case PbMessageType::CodecVersion: {
