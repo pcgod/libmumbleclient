@@ -2,11 +2,14 @@ cmake_minimum_required (VERSION 2.6)
 project (libmumbleclient)
 set (libmumbleclient_VERSION_MAJOR 0)
 set (libmumbleclient_VERSION_MINOR 0)
-set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
 include(FindPkgConfig)
 
-find_package(Boost 1.38.0 REQUIRED COMPONENTS system thread)
+if (WIN32)
+	set(Boost_USE_STATIC_LIBS ON)
+endif()
+set(Boost_USE_MULTITHREADED ON)
+find_package(Boost 1.38.0 REQUIRED COMPONENTS system thread date_time regex)
 find_package(OpenSSL REQUIRED)
 find_package(Protobuf REQUIRED)
 
@@ -19,11 +22,17 @@ if (NOT CELT_FOUND)
 endif()
 
 SET(CMAKE_BUILD_TYPE Debug)
-SET(COMMON_CFLAGS "-g -Wall -Wextra -Wfatal-errors -Wshadow -fvisibility=hidden -fvisibility-inlines-hidden")
-SET(CMAKE_C_FLAGS_DEBUG  "${COMMON_CFLAGS} -pedantic")
-SET(CMAKE_CXX_FLAGS_DEBUG "${COMMON_CFLAGS} -Woverloaded-virtual -Wold-style-cast")
+if (NOT WIN32)
+	SET(COMMON_CFLAGS "-g -Wall -Wextra -Wfatal-errors -Wshadow -fvisibility=hidden -fvisibility-inlines-hidden")
+	SET(CMAKE_C_FLAGS_DEBUG  "${COMMON_CFLAGS} -pedantic")
+	SET(CMAKE_CXX_FLAGS_DEBUG "${COMMON_CFLAGS} -Woverloaded-virtual -Wold-style-cast")
+endif()
 
-include_directories(${Boost_INCLUDE_DIRS} ${OPENSSL_INCLUDE_DIR} ${CELT_INCLUDE_DIR})
+if (WIN32)
+	add_definitions(-D_WIN32_WINNT=0x0501 -DBUILDING_STATIC)
+endif()
+
+include_directories(. ${Boost_INCLUDE_DIRS} ${OPENSSL_INCLUDE_DIR} ${CELT_INCLUDE_DIR} ${PROTOBUF_INCLUDE_DIR})
 
 PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS Mumble.proto)
 

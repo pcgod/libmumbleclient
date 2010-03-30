@@ -1,7 +1,7 @@
 #ifndef CLIENT_H_
 #define CLIENT_H_
 
-#include "stdint.h"
+#include <stdint.h>
 
 #include <boost/asio.hpp>
 #include <boost/asio/ssl.hpp>

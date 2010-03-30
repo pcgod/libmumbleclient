@@ -22,4 +22,10 @@ ${SOURCE_DIR}/rate.c
 ${SOURCE_DIR}/vq.c
 )
 
+if (WIN32)
+	include_directories(win32)
+else()
+	include_directories(.)
+endif()
+
 set_target_properties(celt0 PROPERTIES COMPILE_DEFINITIONS HAVE_CONFIG_H)
