@@ -3,7 +3,7 @@
 		#ifdef __GNUC__
 			#define DLL_PUBLIC __attribute__((dllexport))
 		#else
-			#define DLL_PUBLIC __declspec(dllexport) // Note: actually gcc seems to also supports this syntax.
+			#define DLL_PUBLIC __declspec(dllexport)
 		#endif
 	#elif defined(BUILDING_STATIC)
 		#define DLL_PUBLIC
@@ -12,10 +12,10 @@
 		#ifdef __GNUC__
 			#define DLL_PUBLIC __attribute__((dllimport))
 		#else
-			#define DLL_PUBLIC __declspec(dllimport) // Note: actually gcc seems to also supports this syntax.
+			#define DLL_PUBLIC __declspec(dllimport)
 		#endif
-		#define DLL_LOCAL
 	#endif
+	#define DLL_LOCAL
 #else
 	#if __GNUC__ >= 4
 		#define DLL_PUBLIC __attribute__ ((visibility("default")))
