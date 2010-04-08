@@ -474,4 +474,14 @@ void MumbleClient::SetComment(const std::string& text) {
 	SendMessage(PbMessageType::UserState, us, true);
 }
 
+void MumbleClient::JoinChannel(int32_t channel_id) {
+	BOOST_ASSERT(state_ >= kStateAuthenticated);
+
+	MumbleProto::UserState us;
+	us.set_session(session_);
+	us.set_channel_id(channel_id);
+
+	SendMessage(PbMessageType::UserState, us, true);
+}
+
 }  // end namespace MumbleClient

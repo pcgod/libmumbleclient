@@ -70,6 +70,7 @@ class DLL_PUBLIC MumbleClient {
 	void SetComment(const std::string& text);
 	void SendRawUdpTunnel(const char* buffer, int32_t len);
 	void SendUdpMessage(const char* buffer, int32_t len);
+	void JoinChannel(int32_t channel_id);
 
 	void SetTextMessageCallback(TextMessageCallbackType tm) { text_message_callback_ = tm; }
 	void SetAuthCallback(AuthCallbackType a) { auth_callback_ = a; }
