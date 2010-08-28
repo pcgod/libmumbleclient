@@ -162,10 +162,12 @@ void MumbleClient::HandleUserRemove(const MumbleProto::UserRemove& ur) {
 	boost::shared_ptr<User> u = FindUser(ur.session());
 	assert(u);
 
-	user_list_.remove(u);
+	if (u) {
+		user_list_.remove(u);
 
-	if (user_left_callback_)
-		user_left_callback_(*u);
+		if (user_left_callback_)
+			user_left_callback_(*u);
+	}
 }
 
 void MumbleClient::HandleUserState(const MumbleProto::UserState& us) {
@@ -212,10 +214,12 @@ void MumbleClient::HandleChannelRemove(const MumbleProto::ChannelRemove& cr) {
 	boost::shared_ptr<Channel> c = FindChannel(cr.channel_id());
 	assert(c);
 
-	channel_list_.remove(c);
+	if (c) {
+		channel_list_.remove(c);
 
-	if (channel_remove_callback_)
-		channel_remove_callback_(*c);
+		if (channel_remove_callback_)
+			channel_remove_callback_(*c);
+	}
 }
 
 void MumbleClient::HandleChannelState(const MumbleProto::ChannelState& cs) {
@@ -300,7 +304,7 @@ void MumbleClient::ReadHandler(const boost::system::error_code& error) {
 	msg_header.length = ntohl(msg_header.length);
 
 	if (msg_header.length >= 0x7FFFF)
-		exit(1);
+		return;;
 
 	// Receive message body
 	char* buffer = static_cast<char *>(malloc(msg_header.length));
@@ -353,7 +357,7 @@ void MumbleClient::Connect(const Settings& s) {
 	}
 	if (error) {
 		std::cerr << "connection error: " << error.message() << std::endl;
-		exit(1);
+		return;
 	}
 
 #if SSL
@@ -365,7 +369,7 @@ void MumbleClient::Connect(const Settings& s) {
 	tcp_socket_->handshake(boost::asio::ssl::stream_base::client, error);
 	if (error) {
 		std::cerr << "handshake error: " << error.message() << std::endl;
-		exit(1);
+		return;
 	}
 #endif
 
