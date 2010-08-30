@@ -308,21 +308,24 @@ void RelayTunnelCallback(int32_t length, void* buffer, MumbleClient::MumbleClien
 int main(int /* argc */, char** /* argv[] */) {
 	MumbleClient::MumbleClientLib* mcl = MumbleClient::MumbleClientLib::instance();
 
+	MumbleClient::MumbleClientLib::SetLogLevel(0);
+	//MumbleClient::MumbleClientLib::SetLogLevel(1);
+
 	// Create a new client
 	MumbleClient::MumbleClient* mc = mcl->NewClient();
-	MumbleClient::MumbleClient* mc2 = mcl->NewClient();
+	//MumbleClient::MumbleClient* mc2 = mcl->NewClient();
 
 	mc->Connect(MumbleClient::Settings("0xy.org", "64739", "testBot", ""));
-	mc2->Connect(MumbleClient::Settings("0xy.org", "64738", "testBot2", ""));
+	//mc2->Connect(MumbleClient::Settings("0xy.org", "64738", "testBot2", ""));
 
-//	mc->SetAuthCallback(boost::bind(&AuthCallback));
-//	mc->SetTextMessageCallback(boost::bind(&TextMessageCallback, _1, mc));
-//	mc->SetRawUdpTunnelCallback(boost::bind(&RawUdpTunnelCallback, _1, _2));
+	mc->SetAuthCallback(boost::bind(&AuthCallback));
+	mc->SetTextMessageCallback(boost::bind(&TextMessageCallback, _1, mc));
+	mc->SetRawUdpTunnelCallback(boost::bind(&RawUdpTunnelCallback, _1, _2));
 
-	mc->SetRawUdpTunnelCallback(boost::bind(&RelayTunnelCallback, _1, _2, mc2));
-	mc2->SetRawUdpTunnelCallback(boost::bind(&RelayTunnelCallback, _1, _2, mc));
+	//mc->SetRawUdpTunnelCallback(boost::bind(&RelayTunnelCallback, _1, _2, mc2));
+	//mc2->SetRawUdpTunnelCallback(boost::bind(&RelayTunnelCallback, _1, _2, mc));
 
-	boost::thread relay_thread = boost::thread(RelayThread);
+	//boost::thread relay_thread = boost::thread(RelayThread);
 
 //	MumbleClient::MumbleClient* mc2 = mcl->NewClient();
 //	mc2->Connect(MumbleClient::Settings("0xy.org", "64739", "testBot2", ""));

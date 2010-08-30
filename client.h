@@ -130,6 +130,6 @@ class DLL_PUBLIC MumbleClient {
 	DLL_LOCAL void operator=(const MumbleClient&);
 };
 
-}  // end namespace MumbleClient
+}  // namespace MumbleClient
 
 #endif  // CLIENT_H_

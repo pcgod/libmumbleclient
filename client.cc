@@ -3,12 +3,11 @@
 #include <boost/asio.hpp>
 #include <boost/make_shared.hpp>
 #include <deque>
-#include <fstream>
-#include <iostream>
 #include <typeinfo>
 
 #include "channel.h"
 #include "CryptState.h"
+#include "logging.h"
 #include "settings.h"
 #include "user.h"
 
@@ -25,8 +24,8 @@ template <class T> T ConstructProtobufObject(void* buffer, int32_t length, bool 
 	T pb;
 	pb.ParseFromArray(buffer, length);
 	if (print) {
-		std::cout << ">> IN: " << typeid(T).name() << ":" << std::endl;
-		pb.PrintDebugString();
+		DLOG(INFO) << ">> IN: " << typeid(T).name() << ":";
+		DLOG(INFO) << pb.DebugString();
 	}
 	return pb;
 }
@@ -44,7 +43,7 @@ MumbleClient::MumbleClient(boost::asio::io_service* io_service) : io_service_(io
 
 void MumbleClient::DoPing(const boost::system::error_code& error) {
 	if (error) {
-		std::cerr << "ping error: " << error.message() << std::endl;
+		LOG(ERROR) << "ping error: " << error.message();
 		return;
 	}
 
@@ -104,7 +103,7 @@ void MumbleClient::ParseMessage(const MessageHeader& msg_header, void* buffer) {
 		if (cs.has_key() && cs.has_client_nonce() && cs.has_server_nonce()) {
 			cs_->setKey(reinterpret_cast<const unsigned char *>(cs.key().data()), reinterpret_cast<const unsigned char *>(cs.client_nonce().data()), reinterpret_cast<const unsigned char *>(cs.server_nonce().data()));
 		} else if (cs.has_server_nonce()) {
-			std::cout << "Crypt resync" << std::endl;
+			LOG(WARNING) << "Crypt resync";
 			cs_->setDecryptIV(reinterpret_cast<const unsigned char *>(cs.server_nonce().data()));
 		} else {
 			cs.Clear();
@@ -136,7 +135,7 @@ void MumbleClient::ParseMessage(const MessageHeader& msg_header, void* buffer) {
 		break;
 	}
 	default:
-		std::cout << ">> IN: Unhandled message - Type: " << msg_header.type << " Length: " << msg_header.length << std::endl;
+		DLOG(WARNING) << ">> IN: Unhandled message - Type: " << msg_header.type << " Length: " << msg_header.length;
 	}
 }
 
@@ -182,7 +181,7 @@ void MumbleClient::HandleUserState(const MumbleProto::UserState& us) {
 		if (us.has_hash())
 			nu->hash = us.hash();
 
-		std::cout << "New user " << nu->name << std::endl;
+		DLOG(INFO) << "New user " << nu->name;
 		user_list_.push_back(nu);
 
 		if (user_joined_callback_)
@@ -191,7 +190,7 @@ void MumbleClient::HandleUserState(const MumbleProto::UserState& us) {
 		return;
 	}
 
-	std::cout << "Found user " << u->name << std::endl;
+	DLOG(INFO) << "Found user " << u->name;
 	if (us.has_channel_id()) {
 		// Channel changed
 		boost::shared_ptr<Channel> c = FindChannel(us.channel_id());
@@ -235,7 +234,7 @@ void MumbleClient::HandleChannelState(const MumbleProto::ChannelState& cs) {
 			nc->parent = p;
 		}
 
-		std::cout << "New channel " << nc->name << std::endl;
+		DLOG(INFO) << "New channel " << nc->name;
 		channel_list_.push_back(nc);
 
 		if (channel_add_callback_)
@@ -244,24 +243,24 @@ void MumbleClient::HandleChannelState(const MumbleProto::ChannelState& cs) {
 		return;
 	}
 
-	std::cout << "Found channel" << c->name << std::endl;
+	DLOG(INFO) << "Found channel " << c->name;
 }
 
-#ifndef NDEBUG
+#if !defined(NDEBUG)
 void MumbleClient::PrintChannelList() {
-	std::cout << "-- Channel list --" << std::endl;
+	DLOG(INFO) << "-- Channel list --";
 	for (channel_list_iterator it = channel_list_.begin(); it != channel_list_.end(); ++it) {
-		std::cout << "Channel " << (*it)->name << std::endl;
+		DLOG(INFO) << "Channel " << (*it)->name;
 	}
-	std::cout << "-- Channel list end --" << std::endl;
+	DLOG(INFO) << "-- Channel list end --";
 }
 
 void MumbleClient::PrintUserList() {
-	std::cout << "-- User list --" << std::endl;
+	DLOG(INFO) << "-- User list --";
 	for (user_list_iterator it = user_list_.begin(); it != user_list_.end(); ++it) {
-		std::cout << "User " << (*it)->name << " on " << (*it)->channel.lock()->name << std::endl;
+		DLOG(INFO) << "User " << (*it)->name << " on " << (*it)->channel.lock()->name;
 	}
-	std::cout << "-- User list end --" << std::endl;
+	DLOG(INFO) << "-- User list end --";
 }
 #endif
 
@@ -275,7 +274,7 @@ void MumbleClient::ProcessTCPSendQueue(const boost::system::error_code& error, c
 
 		SendFirstQueued();
 	} else {
-		std::cerr << "Write error: " << error.message() << std::endl;
+		LOG(ERROR) << "Write error: " << error.message();
 	}
 }
 
@@ -287,24 +286,39 @@ void MumbleClient::SendFirstQueued() {
 	bufs.push_back(boost::asio::buffer(msg->msg_, msg->msg_.size()));
 
 	async_write(*tcp_socket_, bufs, boost::bind(&MumbleClient::ProcessTCPSendQueue, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
-	std::cout << "<< ASYNC Type: " << ntohs(msg->header_.type) << " Length: 6+" << msg->msg_.size() << std::endl;
+	DLOG(INFO) << "<< ASYNC Type: " << ntohs(msg->header_.type) << " Length: 6+" << msg->msg_.size();
 }
 
 void MumbleClient::ReadHandler(const boost::system::error_code& error) {
 	if (error) {
-		std::cerr << "read error: " << error.message() << std::endl;
+		LOG(ERROR) << "read error: " << error.message();
 		return;
 	}
 
 	// Receive message header
 	MessageHeader msg_header;
-	read(*tcp_socket_, boost::asio::buffer(reinterpret_cast<char *>(&msg_header), 6));
+	boost::system::error_code err;
+	read(*tcp_socket_, boost::asio::buffer(reinterpret_cast<char *>(&msg_header), 6), boost::asio::transfer_all(), err);
+	// FIXME(pcgod): This is not the correct solution... We should use async_read with a buffer
+	if (err) {
+#if defined(_WIN32)
+		if (err.value() == WSAEWOULDBLOCK) {
+#else
+		if (err.value() == EWOULDBLOCK) {
+#endif
+			if (tcp_socket_)
+				tcp_socket_->async_read_some(boost::asio::null_buffers(), boost::bind(&MumbleClient::ReadHandler, this, boost::asio::placeholders::error));
+		} else {
+			LOG(ERROR) << "read error: " << err.message() << " " << err.value();
+		}
+		return;
+	}
 
 	msg_header.type = ntohs(msg_header.type);
 	msg_header.length = ntohl(msg_header.length);
 
 	if (msg_header.length >= 0x7FFFF)
-		return;;
+		return;
 
 	// Receive message body
 	char* buffer = static_cast<char *>(malloc(msg_header.length));
@@ -330,7 +344,7 @@ MumbleClient::~MumbleClient() {
 
 void MumbleClient::Connect(const Settings& s) {
 	// Resolve hostname
-	std::cerr << "Resolving host " << s.GetHost() << std::endl;
+	LOG(INFO) << "Resolving host " << s.GetHost();
 
 	tcp::resolver resolver(*io_service_);
 	tcp::resolver::query query(s.GetHost(), s.GetPort());
@@ -346,7 +360,7 @@ void MumbleClient::Connect(const Settings& s) {
 #endif
 	boost::system::error_code error = boost::asio::error::host_not_found;
 	while (error && endpoint_iterator != end) {
-		std::cerr << "Connecting to " << (*endpoint_iterator).endpoint().address() << " ..." << std::endl;
+		LOG(INFO) << "Connecting to " << (*endpoint_iterator).endpoint().address() << " ...";
 #if SSL
 		tcp_socket_->lowest_layer().close();
 		tcp_socket_->lowest_layer().connect(*endpoint_iterator++, error);
@@ -356,7 +370,7 @@ void MumbleClient::Connect(const Settings& s) {
 #endif
 	}
 	if (error) {
-		std::cerr << "connection error: " << error.message() << std::endl;
+		LOG(ERROR) << "connection error: " << error.message();
 		return;
 	}
 
@@ -368,12 +382,12 @@ void MumbleClient::Connect(const Settings& s) {
 	// Do SSL handshake
 	tcp_socket_->handshake(boost::asio::ssl::stream_base::client, error);
 	if (error) {
-		std::cerr << "handshake error: " << error.message() << std::endl;
+		LOG(ERROR) << "handshake error: " << error.message();
 		return;
 	}
 #endif
 
-	std::cout << "Handshake completed" << std::endl;
+	LOG(INFO) << "Handshake completed";
 	state_ = kStateHandshakeCompleted;
 
 	boost::asio::ip::tcp::no_delay no_delay_option(true);
@@ -424,8 +438,8 @@ void MumbleClient::Disconnect() {
 
 void MumbleClient::SendMessage(PbMessageType::MessageType type, const ::google::protobuf::Message& new_msg, bool print) {
 	if (print) {
-		std::cout << "<< ENQUEUE: " << type << std::endl;
-		new_msg.PrintDebugString();
+		DLOG(INFO) << "<< ENQUEUE: " << type;
+		DLOG(INFO) << new_msg.DebugString();
 	}
 
 	bool write_in_progress = !send_queue_.empty();
@@ -488,4 +502,4 @@ void MumbleClient::JoinChannel(int32_t channel_id) {
 	SendMessage(PbMessageType::UserState, us, true);
 }
 
-}  // end namespace MumbleClient
+}  // namespace MumbleClient

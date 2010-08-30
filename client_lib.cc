@@ -3,6 +3,7 @@
 #include <iostream>
 
 #include "client.h"
+#include "logging.h"
 #include "settings.h"
 
 namespace MumbleClient {
@@ -47,4 +48,14 @@ void MumbleClientLib::Shutdown() {
 	::google::protobuf::ShutdownProtobufLibrary();
 }
 
-}  // end namespace MumbleClient
+// static
+int32_t MumbleClientLib::GetLogLevel() {
+	return logging::GetLogLevel();
+}
+
+// static
+void MumbleClientLib::SetLogLevel(int32_t level) {
+	logging::SetLogLevel(level);
+}
+
+}  // namespace MumbleClient
