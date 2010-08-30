@@ -24,8 +24,20 @@ endif()
 SET(CMAKE_BUILD_TYPE Debug)
 if (NOT WIN32)
 	SET(COMMON_CFLAGS "-g -Wall -Wextra -Wfatal-errors -Wshadow -Wredundant-decls -Wstrict-null-sentinel -Wmissing-noreturn -Woverloaded-virtual -Winit-self -Wunreachable-code -Wunused -Wunused-function -Wwrite-strings -Wfloat-equal -Wno-ignored-qualifiers -fvisibility=hidden -fvisibility-inlines-hidden")
+
 	SET(CMAKE_C_FLAGS_DEBUG  "${COMMON_CFLAGS} -pedantic")
 	SET(CMAKE_CXX_FLAGS_DEBUG "${COMMON_CFLAGS} -Woverloaded-virtual -Wold-style-cast")
+else()
+	SET(COMMON_CLAGS "/W4")
+
+	SET(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} ${COMMON_CFLAGS}")
+	SET(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} ${COMMON_CFLAGS} /GL")
+
+	SET(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} ${COMMON_CFLAGS}")
+	SET(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} ${COMMON_CFLAGS} /GL")
+
+	SET(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE} /LTCG")
+	SET(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE} /LTCG")
 endif()
 
 if (WIN32)
