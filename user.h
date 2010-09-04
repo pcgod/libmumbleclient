@@ -11,7 +11,7 @@ class Channel;
 
 class User {
   public:
-	User(int32_t session_, boost::shared_ptr<Channel> channel_) : session(session_), channel(channel_) { DLOG(INFO) << "New user"; }
+	User(int32_t session_, boost::shared_ptr<Channel> channel_) : session(session_), channel(channel_) { }
 	~User() { DLOG(INFO) << "User " << name << " destroyed"; }
 	int32_t session;
 	int32_t user_id;

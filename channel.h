@@ -9,7 +9,7 @@ namespace MumbleClient {
 
 class Channel {
   public:
-	Channel(int32_t id_) : id(id_) { DLOG(INFO) << "New channel"; }
+	Channel(int32_t id_) : id(id_) { }
 	~Channel() { DLOG(INFO) << "Channel " << name << " destroyed"; }
 	int32_t id;
 	boost::weak_ptr<Channel> parent;
