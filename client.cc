@@ -13,11 +13,10 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#define MUMBLE_VERSION(x, y, z) ((x << 16) | (y << 8) | (z & 0xFF))
-
 namespace {
 
-template <class T> T ConstructProtobufObject(void* buffer, int32_t length, bool print) {
+template <class T>
+T ConstructProtobufObject(void* buffer, int32_t length, bool print) {
 	T pb;
 	pb.ParseFromArray(buffer, length);
 	if (print) {
@@ -25,6 +24,10 @@ template <class T> T ConstructProtobufObject(void* buffer, int32_t length, bool 
 		DLOG(INFO) << pb.DebugString();
 	}
 	return pb;
+}
+
+inline int32_t MUMBLE_VERSION(int32_t x, int32_t y, int32_t z) {
+	return (x << 16) | (y << 8) | (z & 0xFF);
 }
 
 }  // namespace
@@ -59,13 +62,17 @@ class Message {
 	MessageHeader header_;
 	std::string msg_;
 
-	Message(const MessageHeader& header, const std::string& msg) : header_(header), msg_(msg) {};
+	Message(const MessageHeader& header, const std::string& msg) : header_(header), msg_(msg) { };
 };
 
 ///////////////////////////////////////////////////////////////////////////////
 // MumbleClient, private:
 
-MumbleClient::MumbleClient(boost::asio::io_service* io_service) : io_service_(io_service), cs_(new CryptState()), state_(kStateNew), ping_timer_(NULL) {
+MumbleClient::MumbleClient(boost::asio::io_service* io_service) :
+	io_service_(io_service),
+	cs_(new CryptState()),
+	state_(kStateNew),
+	ping_timer_(NULL) {
 }
 
 void MumbleClient::DoPing(const boost::system::error_code& error) {
@@ -109,7 +116,7 @@ void MumbleClient::ParseMessage(const MessageHeader& msg_header, void* buffer) {
 		break;
 	}
 	case PbMessageType::UserRemove: {
-		MumbleProto::UserRemove ur =ConstructProtobufObject<MumbleProto::UserRemove>(buffer, msg_header.length(), true);
+		MumbleProto::UserRemove ur = ConstructProtobufObject<MumbleProto::UserRemove>(buffer, msg_header.length(), true);
 		HandleUserRemove(ur);
 		break;
 	}
@@ -511,11 +518,11 @@ void MumbleClient::SendRawUdpTunnel(const char* buffer, int32_t len) {
 void MumbleClient::SendUdpMessage(const char* buffer, int32_t len) {
 	assert(cs_->isValid());
 
-	unsigned char* buf = static_cast<unsigned char *>(malloc(len + 4));
+	unsigned char* buf = new unsigned char[len + 4];
 	cs_->encrypt(reinterpret_cast<const unsigned char *>(buffer), buf, len);
 	udp_socket_->send(boost::asio::buffer(buf, len + 4));
 
-	free(buf);
+	delete[] buf;
 }
 
 void MumbleClient::SetComment(const std::string& text) {
