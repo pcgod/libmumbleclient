@@ -33,7 +33,7 @@ const LogSeverity LOG_NUM_SEVERITIES = 4;
 #endif
 
 class LogMessage {
- public:
+  public:
 	LogMessage(const char* file, int32_t line);
 	LogMessage(const char* file, int32_t line, LogSeverity severity);
 
@@ -41,7 +41,7 @@ class LogMessage {
 
 	std::ostream& stream() { return stream_; }
 
- private:
+  private:
 	void Init(const char* file, int32_t line);
 
 	LogSeverity severity_;

@@ -1,5 +1,13 @@
+#if defined(_WIN32)
 #include <windows.h>
+#endif
+#if defined(__linux)
+#include <syscall.h>
+#endif
 #include <stdint.h>
+#include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 #include <ctime>
 #include <iomanip>
@@ -58,8 +66,13 @@ void LogMessage::Init(const char* file, int32_t line) {
 	stream_ << CurrentThreadId() << ':';
 
 	time_t t = time(NULL);
-	struct tm local_time = {0};
+
+	struct tm local_time;
+#if defined(_WIN32)
 	localtime_s(&local_time, &t);
+#else
+	localtime_r(&t, &local_time);
+#endif
 	struct tm* tm_time = &local_time;
 	stream_ << std::setfill('0')
 		<< std::setw(2) << 1 + tm_time->tm_mon
