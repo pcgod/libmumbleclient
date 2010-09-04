@@ -29,7 +29,7 @@ const LogSeverity LOG_NUM_SEVERITIES = 4;
 #if !defined(NDEBUG)
 #define DLOG(severity) MC_LOG_ ## severity.stream()
 #else
-#define DLOG(severity) true ? 0 : logging::LogMessageVoidify() & LOG(severity)
+#define DLOG(severity) true ? 0 : ::MumbleClient::logging::LogMessageVoidify() & LOG(severity)
 #endif
 
 class LogMessage {
