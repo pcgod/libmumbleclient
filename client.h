@@ -21,27 +21,10 @@ using boost::asio::ssl::stream;
 
 class Channel;
 class CryptState;
+class Message;
+class MessageHeader;
 class Settings;
 class User;
-
-namespace mumble_message {
-
-#pragma pack(push)
-#pragma pack(1)
-struct MessageHeader {
-	int16_t type;
-	int32_t length;
-};
-#pragma pack(pop)
-
-struct Message {
-	MessageHeader header_;
-	std::string msg_;
-
-	Message(const MessageHeader& header, const std::string& msg) : header_(header), msg_(msg) {};
-};
-
-}  // namespace mumble_message
 
 typedef std::list< boost::shared_ptr<User> >::iterator user_list_iterator;
 typedef std::list< boost::shared_ptr<Channel> >::iterator channel_list_iterator;
@@ -91,10 +74,12 @@ class DLL_PUBLIC MumbleClient {
 	DLL_LOCAL MumbleClient(boost::asio::io_service* io_service);
 
 	DLL_LOCAL void DoPing(const boost::system::error_code& error);
-	DLL_LOCAL void ParseMessage(const mumble_message::MessageHeader& msg_header, void* buffer);
+	DLL_LOCAL void ParseMessage(const MessageHeader& msg_header, void* buffer);
 	DLL_LOCAL void ProcessTCPSendQueue(const boost::system::error_code& error, const size_t bytes_transferred);
 	DLL_LOCAL void SendFirstQueued();
+	DLL_LOCAL void HandleMessageContent(std::istream& is, const MessageHeader& msg_header);
 	DLL_LOCAL void ReadHandler(const boost::system::error_code& error);
+	DLL_LOCAL void ReadHandlerContinue(const MessageHeader msg_header, const boost::system::error_code& error);
 	DLL_LOCAL void HandleUserRemove(const MumbleProto::UserRemove& ur);
 	DLL_LOCAL void HandleUserState(const MumbleProto::UserState& us);
 	DLL_LOCAL void HandleChannelState(const MumbleProto::ChannelState& cs);
@@ -109,8 +94,9 @@ class DLL_PUBLIC MumbleClient {
 	tcp::socket* tcp_socket_;
 #endif
 	udp::socket* udp_socket_;
+	boost::asio::streambuf recv_buffer_;
 	CryptState* cs_;
-	std::deque< boost::shared_ptr<mumble_message::Message> > send_queue_;
+	std::deque< boost::shared_ptr<Message> > send_queue_;
 	State state_;
 	boost::asio::deadline_timer* ping_timer_;
 	int32_t session_;
