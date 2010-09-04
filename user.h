@@ -11,8 +11,8 @@ class Channel;
 
 class User {
   public:
-	User(int32_t session_, boost::shared_ptr<Channel> channel_) : session(session_), channel(channel_) { DLOG(INFO) << "New user" << std::endl; }
-	~User() { DLOG(INFO) << "User " << name << " destroyed" << std::endl; }
+	User(int32_t session_, boost::shared_ptr<Channel> channel_) : session(session_), channel(channel_) { DLOG(INFO) << "New user"; }
+	~User() { DLOG(INFO) << "User " << name << " destroyed"; }
 	int32_t session;
 	int32_t user_id;
 	boost::weak_ptr<Channel> channel;
