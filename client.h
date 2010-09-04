@@ -77,7 +77,7 @@ class DLL_PUBLIC MumbleClient {
 	DLL_LOCAL void ParseMessage(const MessageHeader& msg_header, void* buffer);
 	DLL_LOCAL void ProcessTCPSendQueue(const boost::system::error_code& error, const size_t bytes_transferred);
 	DLL_LOCAL void SendFirstQueued();
-	DLL_LOCAL void HandleMessageContent(std::istream& is, const MessageHeader& msg_header);
+	DLL_LOCAL bool HandleMessageContent(std::istream& is, const MessageHeader& msg_header);
 	DLL_LOCAL void ReadHandler(const boost::system::error_code& error);
 	DLL_LOCAL void ReadHandlerContinue(const MessageHeader msg_header, const boost::system::error_code& error);
 	DLL_LOCAL void HandleUserRemove(const MumbleProto::UserRemove& ur);

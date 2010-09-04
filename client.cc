@@ -323,12 +323,12 @@ void MumbleClient::SendFirstQueued() {
 	DLOG(INFO) << "<< ASYNC Type: " << msg->header_.type() << " Length: 6+" << msg->msg_.size();
 }
 
-void MumbleClient::HandleMessageContent(std::istream& is, const MessageHeader& msg_header) {
+bool MumbleClient::HandleMessageContent(std::istream& is, const MessageHeader& msg_header) {
 	if (static_cast<int32_t>(recv_buffer_.size()) < msg_header.length()) {
 		// The message is incomplete, read the rest
 		if (tcp_socket_)
 			async_read(*tcp_socket_, recv_buffer_, boost::asio::transfer_at_least(msg_header.length() - recv_buffer_.size()), boost::bind(&MumbleClient::ReadHandlerContinue, this, msg_header, boost::asio::placeholders::error));
-		return;
+		return false;
 	}
 
 	// Receive message body
@@ -336,6 +336,8 @@ void MumbleClient::HandleMessageContent(std::istream& is, const MessageHeader& m
 	is.read(buffer, msg_header.length());
 	ParseMessage(msg_header, buffer);
 	delete[] buffer;
+
+	return true;
 }
 
 void MumbleClient::ReadHandler(const boost::system::error_code& error) {
@@ -351,9 +353,10 @@ void MumbleClient::ReadHandler(const boost::system::error_code& error) {
 		is >> msg_header;
 
 		if (msg_header.length() >= 0x7FFFF)
-			return;
+			assert(false);
 
-		HandleMessageContent(is, msg_header);
+		if (!HandleMessageContent(is, msg_header))
+			return;
 	} while (recv_buffer_.size() >= 6);
 
 	// Requeue read
