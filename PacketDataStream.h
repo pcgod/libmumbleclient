@@ -36,6 +36,8 @@
 #include <deque>
 #include <vector>
 
+namespace MumbleClient {
+
 /*
  * GCC doesn't yet do inter-object-file inlining, so unfortunately, this all has to be defined here.
  */
@@ -352,5 +354,7 @@ class PacketDataStream {
 			return *this;
 		}
 };
+
+}  // namespace MumbleClient
 
 #endif

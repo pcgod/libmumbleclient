@@ -2,9 +2,11 @@
 #define CLIENT_H_
 
 #include <stdint.h>
+#include <list>
 
 #include <boost/asio.hpp>
 #include <boost/asio/ssl.hpp>
+#include <boost/function.hpp>
 #include <boost/shared_ptr.hpp>
 
 #include "messages.h"
@@ -12,10 +14,6 @@
 #include "visibility.h"
 
 namespace MumbleClient {
-
-using boost::asio::ip::tcp;
-using boost::asio::ip::udp;
-using boost::asio::ssl::stream;
 
 #define SSL 1
 
@@ -89,11 +87,11 @@ class DLL_PUBLIC MumbleClient {
 
 	boost::asio::io_service* io_service_;
 #if SSL
-	stream<tcp::socket>* tcp_socket_;
+	boost::asio::ssl::stream<boost::asio::ip::tcp::socket>* tcp_socket_;
 #else
-	tcp::socket* tcp_socket_;
+	boost::asio::ip::tcp::socket* tcp_socket_;
 #endif
-	udp::socket* udp_socket_;
+	boost::asio::ip::udp::socket* udp_socket_;
 	boost::asio::streambuf recv_buffer_;
 	CryptState* cs_;
 	std::deque< boost::shared_ptr<Message> > send_queue_;

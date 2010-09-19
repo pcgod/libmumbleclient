@@ -72,6 +72,6 @@ class CryptState {
 		void encrypt(const unsigned char* source, unsigned char* dst, unsigned int plain_length);
 };
 
-}  // end namespace MumbleClient
+}  // namespace MumbleClient
 
 #endif

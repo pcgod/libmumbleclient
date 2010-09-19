@@ -1,6 +1,5 @@
 #include "client.h"
 
-#include <boost/asio.hpp>
 #include <boost/make_shared.hpp>
 #include <deque>
 #include <typeinfo>
@@ -26,7 +25,7 @@ T ConstructProtobufObject(void* buffer, int32_t length, bool print) {
 	return pb;
 }
 
-inline int32_t MUMBLE_VERSION(int32_t x, int32_t y, int32_t z) {
+inline int32_t MUMBLE_VERSION(int16_t x, int16_t y, int16_t z) {
 	return (x << 16) | (y << 8) | (z & 0xFF);
 }
 
@@ -37,8 +36,9 @@ namespace MumbleClient {
 
 class MessageHeader {
   public:
-	int16_t type() const { return (d_[0] << 8) + d_[1]; }
-	int32_t length() const { return (d_[2] << 24) + (d_[3] << 16) + (d_[4] << 8) + d_[5]; }
+	int16_t type() const { return (d_[0] << 8) | d_[1]; }
+	int32_t length() const { return (d_[2] << 24) | (d_[3] << 16) | (d_[4] << 8) | d_[5]; }
+
 	void type(int16_t t_) { d_[0] = t_ >> 8; d_[1] = t_ & 0xFF; }
 	void length(int32_t l_) {
 		d_[2] = static_cast<unsigned char>(l_ >> 24);
@@ -59,10 +59,10 @@ class MessageHeader {
 
 class Message {
   public:
+	Message(const MessageHeader& header, const std::string& msg) : header_(header), msg_(msg) { };
+
 	MessageHeader header_;
 	std::string msg_;
-
-	Message(const MessageHeader& header, const std::string& msg) : header_(header), msg_(msg) { };
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -392,17 +392,17 @@ void MumbleClient::Connect(const Settings& s) {
 	// Resolve hostname
 	LOG(INFO) << "Resolving host " << s.GetHost();
 
-	tcp::resolver resolver(*io_service_);
-	tcp::resolver::query query(s.GetHost(), s.GetPort());
-	tcp::resolver::iterator endpoint_iterator = resolver.resolve(query);
-	tcp::resolver::iterator end;
+	boost::asio::ip::tcp::resolver resolver(*io_service_);
+	boost::asio::ip::tcp::resolver::query query(s.GetHost(), s.GetPort());
+	boost::asio::ip::tcp::resolver::iterator endpoint_iterator = resolver.resolve(query);
+	boost::asio::ip::tcp::resolver::iterator end;
 
 	// Try to connect
 #if SSL
 	boost::asio::ssl::context ctx(*io_service_, boost::asio::ssl::context::tlsv1);
-	tcp_socket_ = new boost::asio::ssl::stream<tcp::socket>(*io_service_, ctx);
+	tcp_socket_ = new boost::asio::ssl::stream<boost::asio::ip::tcp::socket>(*io_service_, ctx);
 #else
-	tcp_socket_ = new tcp::socket(*io_service_);
+	tcp_socket_ = new boost::asio::ip::tcp::socket(*io_service_);
 #endif
 	boost::system::error_code error = boost::asio::error::host_not_found;
 	while (error && endpoint_iterator != end) {
@@ -421,8 +421,8 @@ void MumbleClient::Connect(const Settings& s) {
 	}
 
 #if SSL
-	udp::endpoint udp_endpoint(tcp_socket_->lowest_layer().remote_endpoint().address(), tcp_socket_->lowest_layer().remote_endpoint().port());
-	udp_socket_ = new udp::socket(*io_service_);
+	boost::asio::ip::udp::endpoint udp_endpoint(tcp_socket_->lowest_layer().remote_endpoint().address(), tcp_socket_->lowest_layer().remote_endpoint().port());
+	udp_socket_ = new boost::asio::ip::udp::socket(*io_service_);
 	udp_socket_->connect(udp_endpoint, error);
 
 	// Do SSL handshake

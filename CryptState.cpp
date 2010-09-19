@@ -42,6 +42,7 @@
 #include <openssl/rand.h>
 #include <stdint.h>
 #include <string.h>
+#include <cstdio>
 
 namespace MumbleClient {
 
@@ -191,6 +192,8 @@ bool CryptState::decrypt(const unsigned char* source, unsigned char* dst, unsign
 	return true;
 }
 
+namespace {
+
 #if defined(__LP64__)
 
 #define BLOCKSIZE 2
@@ -216,37 +219,38 @@ static inline uint64_t SWAP64(register uint64_t __in) { register uint64_t __out;
 #define BLOCKSIZE 4
 #define SHIFTBITS 31
 typedef uint32_t subblock;
-#define SWAPPED(x) htonl(x)
+#define SWAPPED(x) __builtin_bswap32(x)
 #endif
 
 typedef subblock keyblock[BLOCKSIZE];
 
 #define HIGHBIT (1<<SHIFTBITS);
 
-
-static void inline XOR(subblock* dst, const subblock* a, const subblock* b) {
+void inline XOR(subblock* dst, const subblock* a, const subblock* b) {
 	for (int i = 0; i < BLOCKSIZE; i++)
 		dst[i] = a[i] ^ b[i];
 }
 
-static void inline S2(subblock* block) {
+void inline S2(subblock* block) {
 	subblock carry = SWAPPED(block[0]) >> SHIFTBITS;
 	for (int i = 0; i < BLOCKSIZE - 1; i++)
 		block[i] = SWAPPED((SWAPPED(block[i]) << 1) | (SWAPPED(block[i + 1]) >> SHIFTBITS));
 	block[BLOCKSIZE - 1] = SWAPPED((SWAPPED(block[BLOCKSIZE - 1]) << 1) ^(carry * 0x87));
 }
 
-static void inline S3(subblock* block) {
+void inline S3(subblock* block) {
 	subblock carry = SWAPPED(block[0]) >> SHIFTBITS;
 	for (int i = 0; i < BLOCKSIZE - 1; i++)
 		block[i] ^= SWAPPED((SWAPPED(block[i]) << 1) | (SWAPPED(block[i + 1]) >> SHIFTBITS));
 	block[BLOCKSIZE - 1] ^= SWAPPED((SWAPPED(block[BLOCKSIZE - 1]) << 1) ^(carry * 0x87));
 }
 
-static void inline ZERO(keyblock &block) {
+void inline ZERO(keyblock &block) {
 	for (int i = 0; i < BLOCKSIZE; i++)
 		block[i] = 0;
 }
+
+}  // namespace
 
 #define AESencrypt(src,dst,key) AES_encrypt(reinterpret_cast<const unsigned char *>(src),reinterpret_cast<unsigned char *>(dst), key);
 #define AESdecrypt(src,dst,key) AES_decrypt(reinterpret_cast<const unsigned char *>(src),reinterpret_cast<unsigned char *>(dst), key);
@@ -319,4 +323,4 @@ void CryptState::ocb_decrypt(const unsigned char* encrypted, unsigned char* plai
 	AESencrypt(tmp, tag, &encrypt_key);
 }
 
-}  // end namespace MumbleClient
+}  // namespace MumbleClient

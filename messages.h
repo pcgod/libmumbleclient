@@ -10,7 +10,7 @@ namespace UdpMessageType {
 		UDPVoiceSpeex,
 		UDPVoiceCELTBeta
 	};
-}  //end namespace UdpMessageType
+}  // namespace UdpMessageType
 
 namespace PbMessageType {
 	enum MessageType {
@@ -40,8 +40,8 @@ namespace PbMessageType {
 		RequestBlob,
 		ServerConfig
 	};
-}  // end namespace PbMessageType
+}  // namespace PbMessageType
 
-}  // end namespace MumbleClient
+}  // namespace MumbleClient
 
 #endif  // MESSAGES_H_

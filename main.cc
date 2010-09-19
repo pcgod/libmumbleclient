@@ -5,6 +5,8 @@
 
 #include <iostream>
 #include <fstream>
+
+#include <boost/make_shared.hpp>
 #include <boost/thread.hpp>
 
 #include "client.h"
@@ -14,15 +16,17 @@
 #include "PacketDataStream.h"
 #include "settings.h"
 
+namespace {
+
 // Always 48000 for Mumble
-static const int32_t kSampleRate = 48000;
+const int32_t kSampleRate = 48000;
 
-static bool recording = false;
-static bool playback = false;
+bool recording = false;
+bool playback = false;
 
-static boost::thread *playback_thread = NULL;
+boost::thread *playback_thread = NULL;
 
-static inline int32_t pds_int_len(char* x) {
+inline int32_t pds_int_len(char* x) {
 	if ((x[0] & 0x80) == 0x00) {
 		return 1;
 	} else if ((x[0] & 0xC0) == 0x80) {
@@ -189,7 +193,7 @@ void playMp3(MumbleClient::MumbleClient* mc) {
 		flags |= (MumbleClient::UdpMessageType::UDPVoiceCELTAlpha << 5);
 		data[0] = static_cast<unsigned char>(flags);
 
-		PacketDataStream pds(data + 1, 1023);
+		MumbleClient::PacketDataStream pds(data + 1, 1023);
 		seq += frames;
 		pds << seq;
 		// Append |frames| frames to pds
@@ -276,9 +280,9 @@ struct RelayMessage {
 	RelayMessage(MumbleClient::MumbleClient* mc_, const std::string& message_) : mc(mc_), message(message_) { }
 };
 
-static boost::condition_variable cond;
-static boost::mutex mut;
-static std::deque< boost::shared_ptr<RelayMessage> > relay_queue;
+boost::condition_variable cond;
+boost::mutex mut;
+std::deque< boost::shared_ptr<RelayMessage> > relay_queue;
 
 void RelayThread() {
 	boost::unique_lock<boost::mutex> lock(mut);
@@ -293,7 +297,6 @@ void RelayThread() {
 	}
 }
 
-#include <boost/make_shared.hpp>
 void RelayTunnelCallback(int32_t length, void* buffer, MumbleClient::MumbleClient* mc) {
 	std::string s(static_cast<char *>(buffer), length);
 	s.erase(1, pds_int_len(&static_cast<char *>(buffer)[1]));
@@ -304,6 +307,8 @@ void RelayTunnelCallback(int32_t length, void* buffer, MumbleClient::MumbleClien
 	}
 	cond.notify_all();
 }
+
+}  // namespace
 
 int main(int /* argc */, char** /* argv[] */) {
 	MumbleClient::MumbleClientLib* mcl = MumbleClient::MumbleClientLib::instance();

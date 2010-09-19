@@ -23,10 +23,11 @@ endif()
 
 SET(CMAKE_BUILD_TYPE Debug)
 if (NOT WIN32)
-	SET(COMMON_CFLAGS "-g -Wall -Wextra -Wfatal-errors -Wshadow -Wredundant-decls -Wstrict-null-sentinel -Wmissing-noreturn -Woverloaded-virtual -Winit-self -Wunreachable-code -Wunused -Wunused-function -Wwrite-strings -Wfloat-equal -Wno-ignored-qualifiers -fvisibility=hidden -fvisibility-inlines-hidden")
+# -Wmissing-noreturn -pthread
+	SET(COMMON_CFLAGS "-g -Wall -Wextra -Wfatal-errors -Wshadow -Wredundant-decls -Winit-self -Wunreachable-code -Wunused -Wunused-function -Wwrite-strings -Wfloat-equal -Wno-ignored-qualifiers -fvisibility=hidden")
 
-	SET(CMAKE_C_FLAGS_DEBUG  "${COMMON_CFLAGS} -pedantic")
-	SET(CMAKE_CXX_FLAGS_DEBUG "${COMMON_CFLAGS} -Woverloaded-virtual -Wold-style-cast")
+	SET(CMAKE_C_FLAGS_DEBUG  "${COMMON_CFLAGS} -pedantic -std=c99")
+	SET(CMAKE_CXX_FLAGS_DEBUG "${COMMON_CFLAGS} -Woverloaded-virtual -Wold-style-cast -Wstrict-null-sentinel -Woverloaded-virtual -fvisibility-inlines-hidden")
 else()
 	SET(COMMON_CLAGS "/W4")
 
